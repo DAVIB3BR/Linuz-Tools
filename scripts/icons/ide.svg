@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#9B59D0"/>
+  <g transform="rotate(-45 64 64)">
+    <!-- borracha -->
+    <rect x="50" y="22" width="28" height="14" rx="5" fill="#FFCDD2"/>
+    <!-- faixa metálica -->
+    <rect x="50" y="36" width="28" height="9" fill="#B0BEC5"/>
+    <!-- corpo -->
+    <rect x="50" y="45" width="28" height="42" fill="#FFFFFF"/>
+    <!-- madeira da ponta -->
+    <polygon points="50,87 78,87 64,108" fill="#FFCC80"/>
+    <!-- grafite -->
+    <polygon points="58,99 70,99 64,108" fill="#455A64"/>
+  </g>
+</svg>

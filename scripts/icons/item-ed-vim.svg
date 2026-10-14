@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#124C8F"/>
+  <g fill="#4FC300">
+    <rect x="26" y="30" width="76" height="9" transform="rotate(24 64 64)"/>
+    <rect x="26" y="44" width="76" height="9" transform="rotate(24 64 64)"/>
+  </g>
+  <text x="64" y="100" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="60"
+        font-weight="bold" fill="#FFFFFF" text-anchor="middle">V</text>
+</svg>

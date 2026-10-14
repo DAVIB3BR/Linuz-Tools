@@ -1,0 +1,30 @@
+name: lunuz-tools
+summary: lunuz tools - Linux-like command line utilities
+description: |
+  A collection of Linux-like command line utilities providing core
+  CLI functions (ls, pwd, cat, grep, find, chmod, chown, etc.) similar
+  to linux toys/busybox, plus language runners for Java, Shell, Python
+  and Node.js scripts.
+version: '1.1.0'
+confinement: strict
+base: core24
+
+apps:
+  lunuz:
+    command: bin/lunuz
+    env:
+      PATH: /usr/local/bin:/usr/bin:/bin:$SNAP/bin
+
+plugs:
+  - home
+  - mount-observe
+
+parts:
+  lunuz-tools:
+    plugin: python
+    source: .
+    stage-packages:
+      # Java runtime + shell for the language runners
+      - default-jre-headless
+      - bash
+      - coreutils

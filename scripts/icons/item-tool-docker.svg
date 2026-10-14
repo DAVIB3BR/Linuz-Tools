@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#2496ED"/>
+  <!-- contêineres -->
+  <g fill="#FFFFFF">
+    <rect x="26" y="42" width="17" height="14" rx="2"/>
+    <rect x="47" y="42" width="17" height="14" rx="2"/>
+    <rect x="68" y="42" width="17" height="14" rx="2"/>
+    <rect x="47" y="26" width="17" height="12" rx="2"/>
+  </g>
+  <!-- baleia -->
+  <path d="M18 72 h86 c0 16 -12 28 -30 28 h-30 c-16 0 -26 -10 -26 -28 Z" fill="#FFFFFF"/>
+  <path d="M100 72 L118 54 L118 96 Z" fill="#FFFFFF"/>
+  <circle cx="38" cy="84" r="4" fill="#2496ED"/>
+</svg>

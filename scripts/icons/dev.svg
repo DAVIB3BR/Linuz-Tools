@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- etiqueta apontando para a direita -->
+  <path d="M24 22 H86 Q106 22 114 42 L122 60 L114 78 Q106 98 86 98 H24
+           Q12 98 12 86 V34 Q12 22 24 22 Z" fill="#A5322F"/>
+  <!-- grafo (nós conectados) -->
+  <g stroke="#FFFFFF" stroke-width="6" stroke-linecap="round">
+    <line x1="44" y1="46" x2="44" y2="78"/>
+    <line x1="44" y1="62" x2="72" y2="62"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="44" cy="42" r="10"/>
+    <circle cx="44" cy="82" r="10"/>
+    <circle cx="80" cy="62" r="10"/>
+  </g>
+</svg>

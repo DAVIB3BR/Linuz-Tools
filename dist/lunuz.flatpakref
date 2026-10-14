@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flatpak-ref>
+  <id>com.davi.lunuz-tools</id>
+  <runtime>org.freedesktop.Platform</runtime>
+  <sdk>org.freedesktop.Sdk</sdk>
+  <finish-args>
+    <arg>--talk-to=org.freedesktop.portal.Desktop</arg>
+  </finish-args>
+</flatpak-ref>

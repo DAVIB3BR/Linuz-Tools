@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <circle cx="64" cy="64" r="58" fill="#F4F6FA" stroke="#E1E5EC" stroke-width="2"/>
+  <!-- arco do velocímetro -->
+  <path d="M26 82 A40 40 0 0 1 102 82" fill="none" stroke="#FFA726" stroke-width="13" stroke-linecap="round"/>
+  <!-- ponteiro -->
+  <line x1="64" y1="80" x2="92" y2="48" stroke="#E53935" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="64" cy="80" r="10" fill="#37474F"/>
+</svg>

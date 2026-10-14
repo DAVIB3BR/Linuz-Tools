@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# lunuz tools - gera todos os pacotes em dist/
+#   .deb .rpm .pkg.tar.zst  +  .tar .tar.gz .tar.bz2 .tar.xz .tar.zst .zip
+#   + flatpak (manifest/ref) + snap (yaml) + repo dnf/yum
+# Uso: bash scripts/make_dist.sh
+set -eu
+cd "$(dirname "$0")/.."
+ROOT="$PWD"
+VER=$(python3 -c "import sys; sys.path.insert(0,'.'); from lunuz import __version__; print(__version__)")
+NAME="lunuz-tools"
+DIST="$ROOT/dist"
+STAGE="$DIST/stage"
+rm -rf "$DIST"
+mkdir -p "$DIST" "$STAGE"
+
+echo "== lunuz tools $VER - gerando pacotes =="
+
+# ------------------------------------------------------------------
+# 1) rootfs (layout de instalacao: deb / rpm / pkg arch)
+# ------------------------------------------------------------------
+ROOTFS="$STAGE/rootfs"
+mkdir -p "$ROOTFS/usr/bin" \
+         "$ROOTFS/usr/share/applications" \
+         "$ROOTFS/usr/share/icons/hicolor/128x128/apps"
+rsync -a --delete --exclude '__pycache__' "$ROOT/lunuz" "$ROOTFS/usr/lib/"
+cat > "$ROOTFS/usr/bin/lunuz" <<'WRAP'
+#!/bin/sh
+# lunuz tools - wrapper instalado pelo pacote
+export PYTHONPATH="/usr/lib/lunuz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m lunuz "$@"
+WRAP
+chmod 755 "$ROOTFS/usr/bin/lunuz"
+sed -e 's|^Exec=lunuz$|Exec=lunuz gui|' -e 's|^Exec=lunuz --help$|Exec=lunuz --help|' \
+    "$ROOT/AppDir/lunuz.desktop" > "$ROOTFS/usr/share/applications/lunuz-tools.desktop"
+cp "$ROOT/AppDir/lunuz.png" "$ROOTFS/usr/share/icons/hicolor/128x128/apps/lunuz.png"
+
+# ------------------------------------------------------------------
+# 2) arvore de fonte (tars / zip)
+# ------------------------------------------------------------------
+SRC="$STAGE/lunuz-tools-$VER"
+mkdir -p "$SRC/scripts"
+rsync -a --delete --exclude '__pycache__' "$ROOT/lunuz" "$SRC/"
+rsync -a --delete "$ROOT/tests" "$SRC/"
+cp "$ROOT/README.md" "$ROOT/README.pt-BR.md" "$ROOT/setup.py" \
+   "$ROOT/AppRun.sh" "$ROOT/org.davi.lunuz-tools.json" \
+   "$ROOT/snapcraft.yaml" "$ROOT/lunuz.flatpakref" \
+   "$ROOT/scripts/make_dist.sh" "$SRC/" 2>/dev/null || true
+mv -f "$SRC/make_dist.sh" "$SRC/scripts/make_dist.sh" 2>/dev/null || true
+
+# ------------------------------------------------------------------
+# 3) tarballs + zip (codigo)
+# ------------------------------------------------------------------
+echo "  - tar / tar.gz / tar.bz2 / tar.xz / tar.zst / zip"
+( cd "$STAGE" && tar -cf         "$DIST/lunuz-tools-$VER.tar"          "lunuz-tools-$VER" )
+( cd "$STAGE" && tar -czf        "$DIST/lunuz-tools-$VER.tar.gz"       "lunuz-tools-$VER" )
+( cd "$STAGE" && tar -cjf        "$DIST/lunuz-tools-$VER.tar.bz2"      "lunuz-tools-$VER" )
+( cd "$STAGE" && tar -cJf        "$DIST/lunuz-tools-$VER.tar.xz"       "lunuz-tools-$VER" )
+( cd "$STAGE" && tar --zstd -cf  "$DIST/lunuz-tools-$VER.tar.zst"      "lunuz-tools-$VER" )
+( cd "$STAGE" && zip -qr         "$DIST/lunuz-tools-$VER.zip"          "lunuz-tools-$VER" )
+
+# ------------------------------------------------------------------
+# 4) .deb (Debian/Ubuntu)
+# ------------------------------------------------------------------
+if command -v dpkg-deb >/dev/null 2>&1; then
+  echo "  - deb"
+  mkdir -p "$ROOTFS/DEBIAN"
+  ISIZE=$(du -sk "$ROOTFS/usr" | cut -f1)
+  cat > "$ROOTFS/DEBIAN/control" <<CTRL
+Package: lunuz-tools
+Version: $VER
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-vte-2.91
+Maintainer: Davi <davi@localhost>
+Installed-Size: $ISIZE
+Description: lunuz tools - CLI utilities with a LinuxToys-style GUI
+ A collection of command line utilities (ls, grep, find, chmod, java,
+ cpp, python, node...) plus a GTK interface with drivers, repositories,
+ kernels, optimization, IDEs and programming language installers.
+CTRL
+  dpkg-deb --build --root-owner-group "$ROOTFS" "$DIST/${NAME}_${VER}_all.deb" >/dev/null
+  rm -rf "$ROOTFS/DEBIAN"
+else
+  echo "  ! dpkg-deb ausente - .deb pulado"
+fi
+
+# ------------------------------------------------------------------
+# 5) .rpm (Fedora/RHEL)
+# ------------------------------------------------------------------
+if command -v rpmbuild >/dev/null 2>&1; then
+  echo "  - rpm"
+  TOP="$DIST/rpmbuild"
+  mkdir -p "$TOP/BUILD" "$TOP/RPMS" "$TOP/SOURCES" "$TOP/SPECS" "$TOP/SRPMS"
+  cat > "$TOP/SPECS/lunuz-tools.spec" <<SPEC
+Name: lunuz-tools
+Version: $VER
+Release: 1
+Summary: CLI utilities with a LinuxToys-style GUI
+License: Unspecified
+URL: https://github.com/davi/lunuz-tools
+AutoReqProv: no
+BuildArch: noarch
+Requires: python3, python3-gobject, gtk3, vte291
+
+%description
+A collection of command line utilities (ls, grep, find, chmod, java,
+cpp, python, node...) plus a GTK interface with drivers, repositories,
+kernels, optimization, IDEs and programming language installers.
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}
+cp -a %{_sourcedir}/rootfs/. %{buildroot}/
+
+%files
+%defattr(-,root,root,-)
+/usr/lib/lunuz
+/usr/bin/lunuz
+/usr/share/applications/lunuz-tools.desktop
+/usr/share/icons/hicolor/128x128/apps/lunuz.png
+SPEC
+  rpmbuild -bb --define "_topdir $TOP" --define "_sourcedir $STAGE" \
+      "$TOP/SPECS/lunuz-tools.spec" >/dev/null
+  mv "$TOP"/RPMS/noarch/*.rpm "$DIST/${NAME}-${VER}-1.noarch.rpm"
+else
+  echo "  ! rpmbuild ausente - .rpm pulado"
+fi
+
+# ------------------------------------------------------------------
+# 6) .pkg.tar.zst (Arch/Manjaro) - layout pacman manual
+# ------------------------------------------------------------------
+echo "  - pkg.tar.zst (arch)"
+PKGDIR="$STAGE/pkg"
+rm -rf "$PKGDIR"
+mkdir -p "$PKGDIR"
+cp -a "$ROOTFS/usr" "$PKGDIR/"
+SIZE=$(du -sk "$PKGDIR/usr" | cut -f1)
+cat > "$PKGDIR/.PKGINFO" <<PI
+pkgname = $NAME
+pkgver = $VER-1
+pkgdesc = CLI utilities with a LinuxToys-style GUI
+url = https://github.com/davi/lunuz-tools
+builddate = $(date +%s)
+packager = Davi
+size = $SIZE
+arch = any
+depends = python
+depends = python-gobject
+depends = gtk3
+depends = vte3
+PI
+tar --zstd --owner=0 --group=0 -cf "$DIST/${NAME}-${VER}-1-any.pkg.tar.zst" \
+    -C "$PKGDIR" .PKGINFO usr
+
+# ------------------------------------------------------------------
+# 7) flatpak / snap / repo dnf-yum
+# ------------------------------------------------------------------
+echo "  - flatpak / snap / repo"
+cp "$ROOT/org.davi.lunuz-tools.json" "$DIST/"
+cp "$ROOT/lunuz.flatpakref" "$DIST/"
+cp "$ROOT/snapcraft.yaml" "$DIST/"
+cat > "$DIST/lunuz-tools.repo" <<REPO
+[lunuz-tools]
+name=lunuz tools - \$basearch
+baseurl=https://github.com/davi/lunuz-tools/releases/latest/rpm
+enabled=0
+gpgcheck=0
+REPO
+cat > "$DIST/INSTALL.txt" <<TXT
+lunuz tools $VER - como instalar cada formato
+==============================================
+
+.deb   sudo apt install ./${NAME}_${VER}_all.deb
+.rpm   sudo dnf install ./${NAME}-${VER}-1.noarch.rpm
+.pkg   sudo pacman -U ${NAME}-${VER}-1-any.pkg.tar.zst
+tar    tar -xJf lunuz-tools-$VER.tar.xz && cd lunuz-tools-$VER && python3 -m lunuz gui
+zip    unzip lunuz-tools-$VER.zip && cd lunuz-tools-$VER && python3 -m lunuz gui
+
+flatpak (fonte):  flatpak-builder --user --install build org.davi.lunuz-tools.json
+snap (fonte):     cd snapcraft.yaml-dir && snapcraft     (requer snapd)
+dnf/yum repo:     hospede o .rpm em uma URL e adicione lunuz-tools.repo
+                  sudo dnf config-manager --add-repo lunuz-tools.repo
+TXT
+
+# ------------------------------------------------------------------
+# 8) verificacao
+# ------------------------------------------------------------------
+# remove intermediarios de build (staging + arvore do rpmbuild)
+rm -rf "$STAGE" "$DIST/rpmbuild"
+
+echo "== verificacao =="
+[ -f "$DIST/${NAME}_${VER}_all.deb" ] && { dpkg-deb --info "$DIST/${NAME}_${VER}_all.deb" | sed -n '3,7p'; echo "   arquivos: $(dpkg-deb --contents "$DIST/${NAME}_${VER}_all.deb" | wc -l)"; } || true
+[ -f "$DIST/${NAME}-${VER}-1.noarch.rpm" ] && { rpm -qp --info "$DIST/${NAME}-${VER}-1.noarch.rpm" | sed -n '1,6p'; echo "   arquivos: $(rpm -qlp "$DIST/${NAME}-${VER}-1.noarch.rpm" | wc -l)"; } || true
+echo "   pkg arch: $(tar --zstd -tf "$DIST/${NAME}-${VER}-1-any.pkg.tar.zst" | wc -l) arquivos"
+echo "   zip:      $(unzip -l "$DIST/lunuz-tools-$VER.zip" | tail -1)"
+
+echo
+echo "OK - pacotes em $DIST:"
+ls -la "$DIST" | grep -v '^d' | grep -v total

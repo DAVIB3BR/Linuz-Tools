@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#F5F5F7"/>
+  <!-- cabeça de llama (Ollama) -->
+  <g fill="#141414">
+    <path d="M40 44 L44 18 L58 40 Z"/>
+    <path d="M70 40 L84 18 L88 44 Z"/>
+    <ellipse cx="64" cy="58" rx="26" ry="24"/>
+    <rect x="42" y="70" width="44" height="34" rx="16"/>
+  </g>
+  <circle cx="54" cy="54" r="4" fill="#F5F5F7"/>
+  <circle cx="74" cy="54" r="4" fill="#F5F5F7"/>
+</svg>

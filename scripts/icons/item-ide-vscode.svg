@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#0065A9"/>
+  <!-- fita estilizada do VS Code -->
+  <path d="M96 26 L58 62 L74 62 L74 66 L54 66 L34 46 L34 40 L46 32 L34 24 L34 86 L46 78 L34 70 L34 64 L54 84 L74 84 L74 88 L58 88 L96 102 Z"
+        fill="#FFFFFF" transform="rotate(180 64 64)" opacity="0"/>
+  <path d="M40 34 L74 64 L40 94 L40 76 L58 64 L40 52 Z" fill="#FFFFFF"/>
+  <path d="M84 38 L100 52 L84 66 Z" fill="#FFFFFF"/>
+</svg>

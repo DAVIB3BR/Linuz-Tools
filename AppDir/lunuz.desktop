@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=lunuz tools
+Comment=A collection of Linux-like command line utilities
+Exec=lunuz
+Terminal=false
+Type=Application
+Categories=Utility;Development;
+Icon=lunuz
+StartupNotify=true
+Actions=cli;
+
+[Desktop Action cli]
+Name=Open in terminal
+Exec=lunuz --help

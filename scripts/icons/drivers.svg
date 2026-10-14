@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#6C5CE7"/>
+  <!-- pinos -->
+  <g fill="#FFFFFF">
+    <rect x="48" y="28" width="8" height="16" rx="3"/>
+    <rect x="60" y="28" width="8" height="16" rx="3"/>
+    <rect x="72" y="28" width="8" height="16" rx="3"/>
+    <rect x="48" y="84" width="8" height="16" rx="3"/>
+    <rect x="60" y="84" width="8" height="16" rx="3"/>
+    <rect x="72" y="84" width="8" height="16" rx="3"/>
+    <rect x="28" y="48" width="16" height="8" rx="3"/>
+    <rect x="28" y="60" width="16" height="8" rx="3"/>
+    <rect x="28" y="72" width="16" height="8" rx="3"/>
+    <rect x="84" y="48" width="16" height="8" rx="3"/>
+    <rect x="84" y="60" width="16" height="8" rx="3"/>
+    <rect x="84" y="72" width="16" height="8" rx="3"/>
+  </g>
+  <!-- chip -->
+  <rect x="40" y="40" width="48" height="48" rx="9" fill="#FFFFFF"/>
+  <rect x="53" y="53" width="22" height="22" rx="5" fill="#6C5CE7"/>
+</svg>

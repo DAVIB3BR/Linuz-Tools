@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#16181D"/>
+  <text x="64" y="74" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="44"
+        font-weight="bold" fill="#FFFFFF" text-anchor="middle">Py</text>
+  <rect x="34" y="88" width="60" height="8" rx="4" fill="#21D789"/>
+</svg>

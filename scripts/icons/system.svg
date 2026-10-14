@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- asas -->
+  <ellipse cx="22" cy="76" rx="11" ry="26" fill="#141414" transform="rotate(18 22 76)"/>
+  <ellipse cx="106" cy="76" rx="11" ry="26" fill="#141414" transform="rotate(-18 106 76)"/>
+  <!-- pés -->
+  <ellipse cx="44" cy="114" rx="18" ry="10" fill="#FFB300"/>
+  <ellipse cx="84" cy="114" rx="18" ry="10" fill="#FFB300"/>
+  <!-- silhueta (corpo + cabeça) -->
+  <path d="M64 6 C90 6 106 26 106 50 C106 64 98 72 94 78 C104 88 110 100 110 110
+           C110 120 88 124 64 124 C40 124 18 120 18 110 C18 100 24 88 34 78
+           C30 72 22 64 22 50 C22 26 38 6 64 6 Z" fill="#141414"/>
+  <!-- barriga -->
+  <ellipse cx="64" cy="94" rx="30" ry="26" fill="#FFFFFF"/>
+  <!-- rosto -->
+  <ellipse cx="64" cy="44" rx="26" ry="22" fill="#FFFFFF"/>
+  <!-- olhos -->
+  <circle cx="55" cy="37" r="6.5" fill="#141414"/>
+  <circle cx="73" cy="37" r="6.5" fill="#141414"/>
+  <circle cx="57" cy="35" r="2.2" fill="#FFFFFF"/>
+  <circle cx="75" cy="35" r="2.2" fill="#FFFFFF"/>
+  <!-- bico -->
+  <path d="M48 52 Q64 44 80 52 L64 68 Z" fill="#FFC107"/>
+  <path d="M48 52 Q64 57 80 52 L64 68 Z" fill="#FF9800"/>
+</svg>

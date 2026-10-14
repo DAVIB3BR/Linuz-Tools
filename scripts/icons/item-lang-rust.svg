@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#17171B"/>
+  <!-- engrenagem branca (roscas) -->
+  <g fill="#FFFFFF">
+    <circle cx="64" cy="64" r="34"/>
+    <g>
+      <rect x="56" y="14" width="16" height="22" rx="4"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(45 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(90 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(135 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(180 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(225 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(270 64 64)"/>
+      <rect x="56" y="14" width="16" height="22" rx="4" transform="rotate(315 64 64)"/>
+    </g>
+  </g>
+  <circle cx="64" cy="64" r="25" fill="#E85B26"/>
+  <text x="64" y="78" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="36"
+        font-weight="bold" fill="#FFFFFF" text-anchor="middle">R</text>
+</svg>

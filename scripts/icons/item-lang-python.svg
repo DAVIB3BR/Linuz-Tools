@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#306998"/>
+  <!-- cobra superior (azul claro) -->
+  <g fill="#8CC8E8">
+    <path d="M60 16 h30 a16 16 0 0 1 16 16 v22 a14 14 0 0 1 -14 14 h-32 a8 8 0 0 1 0 -16 h26 a4 4 0 0 0 0 -8 h-26 a16 16 0 0 0 -16 16 v6 a24 24 0 0 1 -16 -22 v-20 a16 16 0 0 1 16 -16 z"/>
+    <rect x="36" y="46" width="26" height="14" rx="7"/>
+  </g>
+  <!-- cobra inferior (amarela) -->
+  <g fill="#FFD343">
+    <path d="M68 112 h-30 a16 16 0 0 1 -16 -16 v-22 a14 14 0 0 1 14 -14 h32 a8 8 0 0 1 0 16 h-26 a4 4 0 0 0 0 8 h26 a16 16 0 0 0 16 -16 v-6 a24 24 0 0 1 16 22 v20 a16 16 0 0 1 -16 16 z"/>
+    <rect x="66" y="68" width="26" height="14" rx="7"/>
+  </g>
+  <circle cx="92" cy="28" r="4" fill="#306998"/>
+  <circle cx="36" cy="100" r="4" fill="#306998"/>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- caixa de papelão 3D -->
+  <polygon points="64,16 112,42 64,68 16,42" fill="#E3A968"/>
+  <polygon points="16,42 64,68 64,116 16,90" fill="#C8813F"/>
+  <polygon points="112,42 64,68 64,116 112,90" fill="#AC6C2E"/>
+  <!-- fita -->
+  <polygon points="64,16 76,22.5 64,29 52,22.5" fill="#F2C795"/>
+  <!-- etiqueta -->
+  <polygon points="76,80 104,65 104,79 76,94" fill="#FFFFFF"/>
+</svg>

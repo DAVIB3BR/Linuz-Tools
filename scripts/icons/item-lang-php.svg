@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#777BB4"/>
+  <ellipse cx="64" cy="64" rx="46" ry="34" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+  <text x="64" y="77" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="34"
+        font-weight="bold" fill="#FFFFFF" text-anchor="middle">php</text>
+</svg>

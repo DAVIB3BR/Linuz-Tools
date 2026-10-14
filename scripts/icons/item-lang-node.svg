@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#83CD29"/>
+  <path d="M64 24 L98 44 L98 84 L64 104 L30 84 L30 44 Z" fill="#FFFFFF"/>
+  <text x="64" y="82" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="42"
+        font-weight="bold" fill="#5E9910" text-anchor="middle">N</text>
+</svg>

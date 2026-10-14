@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#CC342D"/>
+  <!-- gema -->
+  <polygon points="34,54 94,54 64,100" fill="#FFFFFF"/>
+  <polygon points="34,54 94,54 84,38 44,38" fill="#F4D8D8"/>
+  <g stroke="#CC342D" stroke-width="3">
+    <line x1="44" y1="54" x2="54" y2="100"/>
+    <line x1="84" y1="54" x2="74" y2="100"/>
+    <line x1="55" y1="38" x2="64" y2="100"/>
+    <line x1="73" y1="38" x2="64" y2="100"/>
+  </g>
+</svg>

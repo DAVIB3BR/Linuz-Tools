@@ -1,0 +1,41 @@
+{
+  "app-id": "org.davi.lunuz-tools",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "24.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "lunuz",
+  "finish-args": [
+    "--filesystem=home",
+    "--share=ipc"
+  ],
+  "modules": [
+    {
+      "name": "openjdk",
+      "buildsystem": "simple",
+      "build-commands": [],
+      "modules": [
+        {
+          "name": "openjdk-21",
+          "buildsystem": "simple"
+        }
+      ]
+    },
+    {
+      "name": "lunuz-tools",
+      "buildsystem": "simple",
+      "build-commands": [
+        "mkdir -p /app/lib",
+        "cp -r lunuz /app/lib/",
+        "mkdir -p /app/bin",
+        "cp AppRun.sh /app/bin/lunuz",
+        "chmod +x /app/bin/lunuz"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "."
+        }
+      ]
+    }
+  ]
+}

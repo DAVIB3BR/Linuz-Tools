@@ -1,0 +1,37 @@
+#!/bin/sh
+# AppRun for lunuz tools - self-locating, no host paths needed
+# Double-click (no args) -> opens the GUI like a regular app
+HERE="$(dirname "$(readlink -f "$0")")"
+# Package lives at $HERE/usr/lib/lunuz -> PYTHONPATH needs its PARENT
+export PYTHONPATH="$HERE/usr/lib${PYTHONPATH:+:$PYTHONPATH}"
+
+# Find python3 (all major distros ship it)
+if command -v python3 >/dev/null 2>&1; then
+    PY=python3
+elif [ -x /usr/bin/python3 ]; then
+    PY=/usr/bin/python3
+elif [ -x /usr/local/bin/python3 ]; then
+    PY=/usr/local/bin/python3
+else
+    echo "lunuz: python3 nao encontrado. Instale o python3 para executar este AppImage." >&2
+    exit 1
+fi
+
+# No arguments: launched by double-click -> open the graphical interface
+if [ $# -eq 0 ]; then
+    if "$PY" -m lunuz gui 2>/tmp/lunuz_gui_err.$$; then
+        rm -f /tmp/lunuz_gui_err.$$
+        exit 0
+    fi
+    # GUI failed (missing GTK/VTE): tell the user with a popup if possible
+    ERR=$(cat /tmp/lunuz_gui_err.$$ 2>/dev/null | head -3)
+    rm -f /tmp/lunuz_gui_err.$$
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --error --title="lunuz tools" --width=420 \
+            --text="Nao foi possivel abrir a interface grafica.\n\n$ERR\n\nInstale: python3-gi gir1.2-gtk-3.0 gir1.2-vte-2.91" 2>/dev/null
+    fi
+    # Fall back to CLI help so output is not silently lost
+    exec "$PY" -m lunuz --help
+fi
+
+exec "$PY" -m lunuz "$@"

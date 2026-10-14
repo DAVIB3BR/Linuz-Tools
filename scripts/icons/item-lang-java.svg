@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#5382A1"/>
+  <!-- xícara -->
+  <path d="M38 66 h44 v16 a14 14 0 0 1 -14 14 h-16 a14 14 0 0 1 -14 -14 z" fill="#FFFFFF"/>
+  <path d="M84 70 a11 11 0 0 1 0 20" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <!-- vapor -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round">
+    <path d="M50 54 q6 -8 0 -14 q-6 -7 0 -12"/>
+    <path d="M68 54 q6 -8 0 -14 q-6 -7 0 -12"/>
+  </g>
+</svg>
