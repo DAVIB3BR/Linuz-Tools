@@ -364,9 +364,9 @@ class LunuzWindow(Gtk.ApplicationWindow):
         readme = _readme_uri()
         footer.set_markup(
             '<span size="small">   <a href="%s">Wiki</a>'
-            "   |   <a href=\"https://github.com/davi/lunuz-tools/issues\">Reportar Bug</a>"
-            "   |   <a href=\"https://github.com/davi/lunuz-tools\">Portal do Desenvolvedor</a>"
-            "   |   <a href=\"https://github.com/davi/lunuz-tools\">Apoie este projeto</a>   </span>"
+            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools/issues\">Reportar Bug</a>"
+            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools\">Portal do Desenvolvedor</a>"
+            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools\">Apoie este projeto</a>   </span>"
             % readme
         )
         footer.connect("activate-link", self.on_link)
@@ -1126,7 +1126,7 @@ def _readme_uri():
         p = os.path.join(base, "README.md")
         if os.path.isfile(p):
             return "file://" + p
-    return "https://github.com/davi/lunuz-tools"
+    return "https://github.com/DAVIB3BR/Linuz-Tools"
 
 
 # ------------------------------------------------------------------
