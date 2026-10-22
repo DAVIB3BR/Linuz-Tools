@@ -1434,6 +1434,241 @@ def build_php_lang():
 
 
 # ==================================================================
+# BUILDERS - Windows no Linux (Wine, Proton, WinBoat e afins)
+# ==================================================================
+def build_wine():
+    """Wine com repositorio oficial (WineHQ) automatico + fallback da distro."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            "dpkg --add-architecture i386 2>/dev/null || true\n"
+            "apt update\n"
+            "apt install -y wget gpg ca-certificates || true\n"
+            "mkdir -p /etc/apt/keyrings\n"
+            "echo 'Adicionando repositorio oficial do WineHQ automaticamente...'\n"
+            "wget -qO- https://dl.winehq.org/wine-builds/winehq.key | "
+            "gpg --dearmor -o /etc/apt/keyrings/winehq-archive.gpg 2>/dev/null || true\n"
+            "CODENAME=$(. /etc/os-release && echo \"$VERSION_CODENAME\")\n"
+            "if grep -qiE 'ubuntu|mint|pop' /etc/os-release; then WBASE=ubuntu; else WBASE=debian; fi\n"
+            "echo \"deb [signed-by=/etc/apt/keyrings/winehq-archive.gpg] "
+            "https://dl.winehq.org/wine-builds/$WBASE $CODENAME main\" > /etc/apt/sources.list.d/winehq.list\n"
+            "apt update || echo 'Aviso: WineHQ pode nao ter este codinome; seguindo com o pacote da distro.'\n"
+            "if apt install -y --install-recommends winehq-stable; then\n"
+            "  echo 'Wine (WineHQ) instalado.'\n"
+            "else\n"
+            "  echo 'WineHQ indisponivel - instalando o Wine da sua distro...'\n"
+            "  apt install -y wine 2>/dev/null || apt install -y wine64 wine32 2>/dev/null || true\n"
+            "fi\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "fedora":
+        return (
+            "set -e\n"
+            + _rpmfusion_block()
+            + "dnf install -y wine winetricks\n"
+            "echo 'Wine instalado (RPM Fusion habilitado automaticamente).'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed wine winetricks 2>/dev/null || pacman -S --noconfirm --needed wine\n"
+            "echo 'Wine instalado (multilib habilitado automaticamente).'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install wine wine-32bit 2>/dev/null || zypper --non-interactive install wine || true\n"
+            "echo 'Wine instalado.'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    return "echo 'Distribuicao nao suportada para Wine'\n"
+
+
+def build_winetricks():
+    """Winetricks: DLLs/componentes do Windows para o Wine."""
+    return build_pkg(["winetricks"], verify="winetricks --version 2>/dev/null | head -1 || true")
+
+
+def build_bottles():
+    """Bottles (Flatpak): garrafas isoladas para apps/jogos do Windows."""
+    return build_flatpak_app("com.usebottles.bottles", "Bottles")
+
+
+def build_lutris():
+    """Lutris: central de jogos com instaladores da comunidade."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            "apt update\n"
+            "apt install -y curl gnupg || true\n"
+            "echo 'Adicionando repositorio oficial do Lutris automaticamente...'\n"
+            "mkdir -p /usr/share/keyrings\n"
+            "curl -fsSL 'https://download.opensuse.org/repositories/home:/strycore/Debian_12/Release.key' | "
+            "gpg --dearmor -o /usr/share/keyrings/lutris.gpg 2>/dev/null || true\n"
+            "echo \"deb [signed-by=/usr/share/keyrings/lutris.gpg] "
+            "https://download.opensuse.org/repositories/home:/strycore/Debian_12/ ./\" > /etc/apt/sources.list.d/lutris.list\n"
+            "apt update || true\n"
+            "apt install -y lutris || echo 'Lutris indisponivel no OBS - baixe em https://lutris.net'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            ". /etc/os-release\n"
+            "if ! zypper --non-interactive install lutris 2>/dev/null; then\n"
+            "  echo 'Adicionando repositorio games do openSUSE automaticamente...'\n"
+            "  if grep -qi tumbleweed /etc/os-release; then GAMES=openSUSE_Tumbleweed; else GAMES=openSUSE_Leap_${VERSION_ID}; fi\n"
+            "  zypper --non-interactive addrepo -cfp 90 "
+            "\"https://download.opensuse.org/repositories/games/$GAMES/\" games || true\n"
+            "  zypper --non-interactive refresh\n"
+            "  zypper --non-interactive install lutris || echo 'Baixe em https://lutris.net'\n"
+            "fi\n"
+        )
+    return build_pkg(["lutris"], verify="lutris --version 2>/dev/null | head -1 || true")
+
+
+def build_protonup():
+    """ProtonUp-Qt (Flatpak): gerencia o Proton-GE do Steam."""
+    return build_flatpak_app("net.davidotek.pupgui2", "ProtonUp-Qt")
+
+
+def build_heroic():
+    """Heroic Games Launcher (Flatpak): Epic, GOG e Amazon Games."""
+    return build_flatpak_app("com.heroicgameslauncher.hgl", "Heroic Games Launcher")
+
+
+def build_steam():
+    """Steam da Valve - habilita os repositorios necessarios sozinho."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            + _debian_nonfree_block()
+            + "dpkg --add-architecture i386 2>/dev/null || true\n"
+            "apt update\n"
+            "apt install -y steam-installer 2>/dev/null || apt install -y steam 2>/dev/null || apt install -y steam-launcher\n"
+            "echo 'Steam instalado.'\n"
+        )
+    if d["family"] == "fedora":
+        return (
+            "set -e\n"
+            + _rpmfusion_block()
+            + "dnf install -y steam\n"
+            "echo 'Steam instalado (RPM Fusion habilitado automaticamente).'\n"
+        )
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed steam\n"
+            "echo 'Steam instalado (multilib habilitado automaticamente).'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install steam\n"
+            "echo 'Steam instalado (Packman habilitado automaticamente).'\n"
+        )
+    return "echo 'Distribuicao nao suportada'\n"
+
+
+def build_playonlinux():
+    """PlayOnLinux: assistente classico para instalar apps via Wine."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return "set -e\napt update\n" + pkg_install(["playonlinux"]) + "\necho 'PlayOnLinux instalado.'\n"
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            "pacman -S --noconfirm --needed playonlinux 2>/dev/null || "
+            "echo 'PlayOnLinux esta no AUR: paru -S playonlinux (prefira o Bottles).'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install playonlinux || echo 'Indisponivel - prefira o Bottles (Flatpak).'\n"
+        )
+    return (
+        "set -e\n"
+        + pkg_install(["playonlinux"]) +
+        " || echo 'PlayOnLinux indisponivel nesta distro - prefira o Bottles (Flatpak).'\n"
+    )
+
+
+def build_winboat():
+    """WinBoat: Windows 11 real em container Docker/Podman, integrado ao
+    desktop. Instala o runtime, baixa a versao mais recente do GitHub e
+    adiciona o usuario ao grupo docker - tudo automaticamente."""
+    return (
+        "set -e\n"
+        "echo '== WinBoat: Windows 11 em container, integrado ao desktop =='\n"
+        "# 1) runtime de container (Docker ou Podman)\n"
+        "if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then\n"
+        "  echo 'Instalando Docker (necessario para o WinBoat)...'\n"
+        "  if command -v apt-get >/dev/null 2>&1; then apt update; apt install -y docker.io docker-compose-v2 2>/dev/null || apt install -y docker.io docker-compose\n"
+        "  elif command -v dnf >/dev/null 2>&1; then dnf install -y moby-engine docker-compose || dnf install -y docker docker-compose\n"
+        "  elif command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm --needed docker docker-compose\n"
+        "  elif command -v zypper >/dev/null 2>&1; then zypper --non-interactive install docker docker-compose\n"
+        "  fi\n"
+        "  systemctl enable --now docker 2>/dev/null || true\n"
+        "fi\n"
+        "# 2) ferramenta de download\n"
+        "if command -v curl >/dev/null 2>&1; then GET='curl -fsSL -o'; APIGET='curl -fsSL';\n"
+        "elif command -v wget >/dev/null 2>&1; then GET='wget -qO'; APIGET='wget -qO-';\n"
+        "else echo 'Instale curl ou wget.'; exit 1; fi\n"
+        "# 3) baixa o instalador mais recente (GitHub releases)\n"
+        "echo 'Buscando a versao mais recente do WinBoat...'\n"
+        "JSON=$($APIGET https://api.github.com/repos/TibixDev/winboat/releases/latest) || { echo 'Falha ao consultar o GitHub.'; exit 1; }\n"
+        "URL=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -iE 'amd64\\.deb$' | head -1)\n"
+        "RPML=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -iE 'x86_64\\.rpm$' | head -1)\n"
+        "APPL=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -i 'AppImage' | head -1)\n"
+        "if command -v dpkg >/dev/null 2>&1 && [ -n \"$URL\" ]; then\n"
+        "  $GET /tmp/winboat.deb \"$URL\"\n"
+        "  dpkg -i /tmp/winboat.deb || apt install -y -f\n"
+        "elif command -v rpm >/dev/null 2>&1 && [ -n \"$RPML\" ]; then\n"
+        "  $GET /tmp/winboat.rpm \"$RPML\"\n"
+        "  if command -v dnf >/dev/null 2>&1; then dnf install -y /tmp/winboat.rpm; else zypper --non-interactive install /tmp/winboat.rpm; fi\n"
+        "elif [ -n \"$APPL\" ]; then\n"
+        "  $GET /usr/local/bin/winboat.AppImage \"$APPL\"\n"
+        "  chmod +x /usr/local/bin/winboat.AppImage\n"
+        "  ln -sf /usr/local/bin/winboat.AppImage /usr/local/bin/winboat\n"
+        "else\n"
+        "  echo 'Nao achei um pacote para sua distro - baixe em https://github.com/TibixDev/winboat/releases'\n"
+        "  exit 1\n"
+        "fi\n"
+        "# 4) usuario no grupo docker (para gerenciar o container sem senha)\n"
+        "if command -v docker >/dev/null 2>&1; then\n"
+        "  REAL_USER=${SUDO_USER:-${PKEXEC_UID:+$(id -nu \"$PKEXEC_UID\" 2>/dev/null)}}\n"
+        "  REAL_USER=${REAL_USER:-$(id -nu 1000 2>/dev/null || echo root)}\n"
+        "  usermod -aG docker \"$REAL_USER\" 2>/dev/null || true\n"
+        "  echo \"Usuario '$REAL_USER' adicionado ao grupo docker (relogue para valer).\"\n"
+        "fi\n"
+        "echo 'WinBoat instalado! Abra o WinBoat e ele prepara o Windows 11 para voce.'\n"
+    )
+
+
+def build_gamemode():
+    """GameMode + MangoHud: boost de desempenho e overlay de FPS."""
+    d = detect_distro()
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed gamemode lib32-gamemode mangohud lib32-mangohud\n"
+            "echo 'GameMode + MangoHud instalados. No Steam: gamemoderun %command% e mangohud %command%'\n"
+        )
+    return build_pkg(["gamemode", "mangohud"],
+                     verify="gamemoded --version 2>/dev/null | head -1 || true")
+
+
+# ==================================================================
 # CATÁLOGO DE CATEGORIAS E ITENS
 # ==================================================================
 def _itens_sistema():
@@ -1711,6 +1946,31 @@ def _itens_ide():
     ]
 
 
+def _itens_windows():
+    return [
+        {"id": "win-wine", "name": "Wine", "desc": "Rode programas .exe do Windows (repo WineHQ automático)",
+         "kind": "shell", "root": True, "danger": False, "script": build_wine},
+        {"id": "win-winetricks", "name": "Winetricks", "desc": "DLLs e componentes do Windows para o Wine",
+         "kind": "shell", "root": True, "danger": False, "script": build_winetricks},
+        {"id": "win-bottles", "name": "Bottles", "desc": "Apps/jogos do Windows em 'garrafas' isoladas (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_bottles},
+        {"id": "win-lutris", "name": "Lutris", "desc": "Central de jogos com instaladores da comunidade",
+         "kind": "shell", "root": True, "danger": False, "script": build_lutris},
+        {"id": "win-protonup", "name": "ProtonUp-Qt", "desc": "Instala/atualiza o Proton-GE do Steam (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_protonup},
+        {"id": "win-heroic", "name": "Heroic Games Launcher", "desc": "Epic, GOG e Amazon Games no Linux (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_heroic},
+        {"id": "win-steam", "name": "Steam", "desc": "Loja da Valve (habilita os repos necessários sozinho)",
+         "kind": "shell", "root": True, "danger": False, "script": build_steam},
+        {"id": "win-playonlinux", "name": "PlayOnLinux", "desc": "Assistente clássico para instalar apps via Wine",
+         "kind": "shell", "root": True, "danger": False, "script": build_playonlinux},
+        {"id": "win-winboat", "name": "WinBoat (Windows 11)", "desc": "Windows 11 real em container, integrado ao desktop",
+         "kind": "shell", "root": True, "danger": True, "script": build_winboat},
+        {"id": "win-gamemode", "name": "GameMode + MangoHud", "desc": "Boost de desempenho e overlay de FPS para jogos",
+         "kind": "shell", "root": True, "danger": False, "script": build_gamemode},
+    ]
+
+
 def _itens_lang():
     return [
         {"id": "lang-python", "name": "Python 3 + pip + venv", "desc": "Linguagem e ecossistema oficiais",
@@ -1749,6 +2009,8 @@ CATEGORIES = [
      "color": "#8a5ad9", "items": _itens_dev()},
     {"id": "ide", "name": "IDEs, Editores e IA", "icon": "text-editor-symbolic",
      "color": "#b85cd9", "items": _itens_ide()},
+    {"id": "windows", "name": "Windows no Linux", "icon": "applications-games-symbolic",
+     "color": "#6c5ce7", "items": _itens_windows()},
     {"id": "lang", "name": "Linguagens de Programação", "icon": "applications-science-symbolic",
      "color": "#d97b2e", "items": _itens_lang()},
     {"id": "health", "name": "Saúde e Bem-estar", "icon": "battery-symbolic",
@@ -1847,6 +2109,17 @@ ITEM_ICONS = {
     "ai-gemini": "applications-science-symbolic",
     "tool-essential": "applications-engineering-symbolic",
     "tool-docker": "package-x-generic-symbolic",
+    # --- Windows no Linux ---
+    "win-wine": "system-run-symbolic",
+    "win-winetricks": "system-software-install-symbolic",
+    "win-bottles": "package-x-generic-symbolic",
+    "win-lutris": "applications-games-symbolic",
+    "win-protonup": "software-update-available-symbolic",
+    "win-heroic": "applications-games-symbolic",
+    "win-steam": "input-gaming-symbolic",
+    "win-playonlinux": "application-x-executable-symbolic",
+    "win-winboat": "computer-symbolic",
+    "win-gamemode": "media-playback-start-symbolic",
     # --- Linguagens de Programação ---
     "lang-python": "text-x-generic-symbolic",
     "lang-java": "applications-science-symbolic",
