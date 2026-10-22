@@ -22,6 +22,10 @@ except Exception as e:  # pragma: no cover
 
 from .actions import (CATEGORIES, all_items, detect_distro, item_icon,
                        item_available, available_families, FAMILY_NAMES)
+from . import i18n
+from .i18n import (t, tr_cat, tr_item, tr_field, get_language, get_language_setting,
+                    set_language, language_display_name, LANGUAGES,
+                    detect_system_language)
 
 
 def _which(name):
@@ -162,7 +166,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         header.set_title("lunuz tools")
 
         self.back_btn = Gtk.Button.new_from_icon_name("go-previous-symbolic", Gtk.IconSize.BUTTON)
-        self.back_btn.set_tooltip_text("Voltar para a pagina inicial")
+        self.back_btn.set_tooltip_text(t("back_tooltip"))
         self.back_btn.connect("clicked", self.on_back)
         self.back_btn.set_visible(False)
         header.pack_start(self.back_btn)
@@ -179,7 +183,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
                 pass
 
         self.search = Gtk.SearchEntry()
-        self.search.set_placeholder_text("Pesquisar recursos...")
+        self.search.set_placeholder_text(t("search_placeholder"))
         self.search.set_width_chars(24)
         self.search.connect("search-changed", self.on_search)
         header.pack_start(self.search)
@@ -194,17 +198,17 @@ class LunuzWindow(Gtk.ApplicationWindow):
         if theme.has_icon("view-grid-symbolic"):
             self.btn_grid.add(Gtk.Image.new_from_icon_name("view-grid-symbolic", Gtk.IconSize.BUTTON))
         else:
-            self.btn_grid.set_label("Grade")
+            self.btn_grid.set_label(t("grid_label"))
         self.btn_grid.set_active(True)
-        self.btn_grid.set_tooltip_text("Visualização em grade")
+        self.btn_grid.set_tooltip_text(t("grid_tooltip"))
         self.btn_grid.connect("toggled", self.on_view_toggle)
 
         self.btn_list = Gtk.ToggleButton()
         if theme.has_icon("view-list-symbolic"):
             self.btn_list.add(Gtk.Image.new_from_icon_name("view-list-symbolic", Gtk.IconSize.BUTTON))
         else:
-            self.btn_list.set_label("Lista")
-        self.btn_list.set_tooltip_text("Visualização em lista")
+            self.btn_list.set_label(t("list_label"))
+        self.btn_list.set_tooltip_text(t("list_tooltip"))
         self.btn_list.connect("toggled", self.on_view_toggle)
 
         view_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
@@ -212,6 +216,13 @@ class LunuzWindow(Gtk.ApplicationWindow):
         view_box.pack_start(self.btn_grid, False, False, 0)
         view_box.pack_start(self.btn_list, False, False, 0)
         header.pack_end(view_box)
+
+        # engrenagem: configuracoes (troca de idioma)
+        self.gear_btn = Gtk.MenuButton()
+        self.gear_btn.add(Gtk.Image.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON))
+        self.gear_btn.set_tooltip_text(t("settings_tooltip"))
+        self.gear_btn.set_popover(self._build_settings_popover())
+        header.pack_end(self.gear_btn)
 
         self.set_titlebar(header)
 
@@ -226,42 +237,10 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.home_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.home_box.set_border_width(18)
 
-        # chip identificador da distro (logo + ações disponíveis aqui)
-        info = detect_distro()
-        self.distro_chip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        chip = self.distro_chip
-        chip.get_style_context().add_class("chip")
-        chip.set_margin_bottom(14)
-        dimg = distro_icon(info, 30)
-        if dimg is not None:
-            chip.pack_start(dimg, False, False, 0)
-        dv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-        t1 = Gtk.Label()
-        t1.set_xalign(0)
-        name_esc = GLib.markup_escape_text(info["name"])
-        ver = info.get("version", "")
-        t1.set_markup(
-            f"<b>{name_esc}</b>"
-            + (f" <small>({GLib.markup_escape_text(ver)})</small>" if ver else "")
-        )
-        t2 = Gtk.Label()
-        t2.set_xalign(0)
-        t2.get_style_context().add_class("dim-label")
-        total = sum(len(c["items"]) for c in CATEGORIES)
-        n_ok = sum(1 for c in CATEGORIES for it in c["items"]
-                   if item_available(it, info["family"]))
-        fam = FAMILY_NAMES.get(info["family"], info["family"])
-        t2.set_text(f"Família {fam} • {n_ok} de {total} ações disponíveis nesta distro")
-        dv.pack_start(t1, False, False, 0)
-        dv.pack_start(t2, False, False, 0)
-        chip.pack_start(dv, True, True, 0)
-        self.home_box.pack_start(chip, False, False, 0)
-
         self.home_grid = Gtk.Grid()
         self.home_grid.set_row_spacing(14)
         self.home_grid.set_column_spacing(14)
         self.home_grid.set_column_homogeneous(True)
-        self.home_box.pack_start(self.home_grid, False, False, 0)
         self.home_scroll.add(self.home_box)
         self.stack.add_named(self.home_scroll, "home")
 
@@ -285,10 +264,10 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.term_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         tpage_head = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         tpage_head.set_border_width(6)
-        tlbl = Gtk.Label()
-        tlbl.set_xalign(0)
-        tlbl.set_markup("<b>Terminal</b> — progresso da instalação")
-        tpage_head.pack_start(tlbl, False, False, 0)
+        self.term_title_lbl = Gtk.Label()
+        self.term_title_lbl.set_xalign(0)
+        self.term_title_lbl.set_markup(f"<b>{t('terminal_title')}</b>")
+        tpage_head.pack_start(self.term_title_lbl, False, False, 0)
         self.spinner = Gtk.Spinner()
         tpage_head.pack_start(self.spinner, False, False, 0)
         self.status_lbl = Gtk.Label()
@@ -296,10 +275,10 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.status_lbl.set_max_width_chars(60)
         self.status_lbl.set_ellipsize(Pango.EllipsizeMode.END)
         tpage_head.pack_start(self.status_lbl, True, True, 0)
-        tclear = Gtk.Button.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON)
-        tclear.set_tooltip_text("Limpar terminal")
-        tclear.connect("clicked", lambda *_: self.terminal.reset(True, True))
-        tpage_head.pack_end(tclear, False, False, 0)
+        self.tclear = Gtk.Button.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON)
+        self.tclear.set_tooltip_text(t("clear_terminal"))
+        self.tclear.connect("clicked", lambda *_: self.terminal.reset(True, True))
+        tpage_head.pack_end(self.tclear, False, False, 0)
         self.term_page.pack_start(tpage_head, False, False, 0)
         self.term_host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.term_page.pack_start(self.term_host, True, True, 0)
@@ -314,14 +293,14 @@ class LunuzWindow(Gtk.ApplicationWindow):
 
         term_head = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         term_head.set_border_width(6)
-        lbl = Gtk.Label()
-        lbl.set_xalign(0)
-        lbl.set_markup("<b>Terminal</b>")
-        term_head.pack_start(lbl, True, True, 0)
-        clear_btn = Gtk.Button.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON)
-        clear_btn.set_tooltip_text("Limpar terminal")
-        clear_btn.connect("clicked", lambda *_: self.terminal.reset(True, True))
-        term_head.pack_end(clear_btn, False, False, 0)
+        self.term_lbl = Gtk.Label()
+        self.term_lbl.set_xalign(0)
+        self.term_lbl.set_markup(f"<b>{t('terminal_plain')}</b>")
+        term_head.pack_start(self.term_lbl, True, True, 0)
+        self.clear_btn = Gtk.Button.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON)
+        self.clear_btn.set_tooltip_text(t("clear_terminal"))
+        self.clear_btn.connect("clicked", lambda *_: self.terminal.reset(True, True))
+        term_head.pack_end(self.clear_btn, False, False, 0)
         term_box.pack_start(term_head, False, False, 0)
 
         self.terminal = Vte.Terminal()
@@ -347,9 +326,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.bot_hint.set_halign(Gtk.Align.CENTER)
         self.bot_hint.set_margin_top(14)
         self.bot_hint.set_margin_bottom(14)
-        self.bot_hint.set_markup(
-            '<span foreground="#8a8a98">Acompanhe o progresso na aba <b>Terminal</b>.</span>'
-        )
+        self.bot_hint.set_markup(t("bottom_hint"))
         self.bot_hint.set_no_show_all(True)
         self.bot_hint.set_visible(False)
         term_box.pack_start(self.bot_hint, False, False, 0)
@@ -361,15 +338,9 @@ class LunuzWindow(Gtk.ApplicationWindow):
         footer.set_margin_top(6)
         footer.set_margin_bottom(6)
         footer.get_style_context().add_class("footer")
-        readme = _readme_uri()
-        footer.set_markup(
-            '<span size="small">   <a href="%s">Wiki</a>'
-            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools/issues\">Reportar Bug</a>"
-            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools\">Portal do Desenvolvedor</a>"
-            "   |   <a href=\"https://github.com/DAVIB3BR/Linuz-Tools\">Apoie este projeto</a>   </span>"
-            % readme
-        )
+        footer.set_markup(self._footer_markup())
         footer.connect("activate-link", self.on_link)
+        self.footer_lbl = footer
 
         # ---------- Composição ----------
         paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
@@ -395,10 +366,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.row_by_id = {}
         self.ind_by_id = {}
         self.connect("key-press-event", self.on_key_press)
-        self.terminal.feed(
-            b"lunuz tools - selecione uma secao na grade acima e clique em uma acao.\r\n"
-            b"Acoes de administracao pedem autenticacao (pkexec).\r\n\r\n"
-        )
+        self.terminal.feed(t("term_welcome").encode())
 
     # ------------------------------------------------------------------
     # Navegação (voltar / páginas / terminal)
@@ -462,13 +430,47 @@ class LunuzWindow(Gtk.ApplicationWindow):
     # ------------------------------------------------------------------
     # Home: grade de categorias
     # ------------------------------------------------------------------
+    def _distro_chip(self):
+        """Chip identificador da distro (logo + acoes disponiveis aqui)."""
+        info = detect_distro()
+        chip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        chip.get_style_context().add_class("chip")
+        chip.set_margin_bottom(14)
+        dimg = distro_icon(info, 30)
+        if dimg is not None:
+            chip.pack_start(dimg, False, False, 0)
+        dv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        t1 = Gtk.Label()
+        t1.set_xalign(0)
+        name_esc = GLib.markup_escape_text(info["name"])
+        ver = info.get("version", "")
+        t1.set_markup(
+            f"<b>{name_esc}</b>"
+            + (f" <small>({GLib.markup_escape_text(ver)})</small>" if ver else "")
+        )
+        t2 = Gtk.Label()
+        t2.set_xalign(0)
+        t2.get_style_context().add_class("dim-label")
+        total = sum(len(c["items"]) for c in CATEGORIES)
+        n_ok = sum(1 for c in CATEGORIES for it in c["items"]
+                   if item_available(it, info["family"]))
+        fam = FAMILY_NAMES.get(info["family"], info["family"])
+        t2.set_text(t("chip_line", family=fam, ok=n_ok, total=total))
+        dv.pack_start(t1, False, False, 0)
+        dv.pack_start(t2, False, False, 0)
+        chip.pack_start(dv, True, True, 0)
+        self.distro_chip = chip  # mantido p/ compatibilidade com os testes
+        return chip
+
     def build_home(self):
-        for child in self.home_grid.get_children():
-            self.home_grid.remove(child)
+        for child in self.home_box.get_children():
+            self.home_box.remove(child)
+        self.home_box.pack_start(self._distro_chip(), False, False, 0)
         cols = 2 if self.btn_grid.get_active() else 1
         for i, cat in enumerate(CATEGORIES):
             tile = self.make_tile(cat)
             self.home_grid.attach(tile, i % cols, i // cols, 1, 1)
+        self.home_box.pack_start(self.home_grid, False, False, 0)
         self.home_box.show_all()
 
     def make_tile(self, cat):
@@ -497,7 +499,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
             box.pack_start(sq, False, False, 0)
 
         lbl = Gtk.Label()
-        lbl.set_text(cat["name"])
+        lbl.set_text(tr_cat(cat))
         lbl.set_xalign(0.5)
         lbl.set_halign(Gtk.Align.CENTER)
 
@@ -544,16 +546,16 @@ class LunuzWindow(Gtk.ApplicationWindow):
 
         head = Gtk.Label()
         head.set_xalign(0)
-        head.set_markup(f'<span size="xx-large" weight="bold">{cat["name"]}</span>')
+        head.set_markup(f'<span size="xx-large" weight="bold">{GLib.markup_escape_text(tr_cat(cat))}</span>')
 
         sub = Gtk.Label()
         sub.set_xalign(0)
         n = len(cat["items"])
         distro = detect_distro()["name"]
         n_ok = sum(1 for it in cat["items"] if item_available(it))
-        txt = f"{n} recursos - detectado: {distro}"
+        txt = t("cat_sub", n=n, distro=distro)
         if n_ok < n:
-            txt += f" - {n_ok}/{n} disponíveis"
+            txt += t("cat_avail", ok=n_ok, n=n)
         sub.set_text(txt)
         sub.get_style_context().add_class("dim-label")
 
@@ -568,7 +570,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.multi_toggle = Gtk.ToggleButton()
         mbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         mbox.pack_start(Gtk.Image.new_from_icon_name("edit-select-all-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
-        mbox.pack_start(Gtk.Label("Seleção múltipla"), False, False, 0)
+        mbox.pack_start(Gtk.Label(t("multi_toggle")), False, False, 0)
         self.multi_toggle.add(mbox)
         self.multi_toggle.set_active(self.multi_mode)
         self.multi_toggle.connect("toggled", self.on_multi_toggle)
@@ -592,7 +594,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.btn_run_sel = Gtk.Button()
         rbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         rbox.pack_start(Gtk.Image.new_from_icon_name("media-playback-start-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
-        rbox.pack_start(Gtk.Label("Executar selecionados"), False, False, 0)
+        rbox.pack_start(Gtk.Label(t("run_selected")), False, False, 0)
         self.btn_run_sel.add(rbox)
         self.btn_run_sel.get_style_context().add_class("suggested-action")
         self.btn_run_sel.connect("clicked", lambda *_: self.on_run_selected())
@@ -600,7 +602,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         btn_clr = Gtk.Button()
         cbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         cbox.pack_start(Gtk.Image.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
-        cbox.pack_start(Gtk.Label("Limpar seleção"), False, False, 0)
+        cbox.pack_start(Gtk.Label(t("clear_sel")), False, False, 0)
         btn_clr.add(cbox)
         btn_clr.connect("clicked", lambda *_: self.clear_selection())
         bar.pack_start(self.btn_run_sel, False, False, 0)
@@ -636,15 +638,16 @@ class LunuzWindow(Gtk.ApplicationWindow):
             lead = sq
 
         texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        tr_name, tr_desc = tr_item(item)
         name = Gtk.Label()
         name.set_xalign(0)
-        title = item["name"]
+        title = tr_name
         if item.get("danger"):
-            title += "   [atenção]"
+            title += "   " + t("attention")
         name.set_markup(f"<b>{GLib.markup_escape_text(title)}</b>")
         desc = Gtk.Label()
         desc.set_xalign(0)
-        desc.set_text(item["desc"])
+        desc.set_text(tr_desc)
         desc.get_style_context().add_class("dim-label")
         texts.pack_start(name, False, False, 0)
         texts.pack_start(desc, False, False, 0)
@@ -660,7 +663,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
             fams = ", ".join(FAMILY_NAMES.get(f, f)
                              for f in available_families(item))
             bad = Gtk.Label()
-            bad.set_text(f"só em {fams}" if fams else "indisponível")
+            bad.set_text(t("only_in", fams=fams) if fams else t("unavailable_badge"))
             bad.set_valign(Gtk.Align.CENTER)
             bad.get_style_context().add_class("badgelbl")
             box.pack_start(lead, False, False, 0)
@@ -682,7 +685,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         elif self.multi_mode:
             # form/file: exigem preenchimento manual - ficam destacados
             man = Gtk.Label()
-            man.set_text("preenchimento manual")
+            man.set_text(t("manual_label"))
             man.get_style_context().add_class("dim-label")
             box.pack_start(lead, False, False, 0)
             box.pack_start(texts, True, True, 0)
@@ -730,7 +733,8 @@ class LunuzWindow(Gtk.ApplicationWindow):
         hits = 0
         low = text.lower()
         for cat, item in all_items():
-            hay = f"{cat['name']} {item['name']} {item['desc']}".lower()
+            tr_name, tr_desc = tr_item(item)
+            hay = f"{tr_cat(cat)} {tr_name} {tr_desc}".lower()
             if low in hay:
                 self.search_box.pack_start(self.make_item_row(cat, item), False, False, 0)
                 hits += 1
@@ -774,8 +778,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
             if kind in ("shell", "info"):
                 self.toggle_select(item)
             else:
-                msg = (f"«{item['name']}» exige preenchimento manual - "
-                       "desative a seleção múltipla para executá-lo.")
+                msg = t("multi_manual_msg", name=tr_item(item)[0])
                 self.set_status(msg)
                 self.terminal.feed(f"# {msg}\r\n".encode())
             return
@@ -783,14 +786,14 @@ class LunuzWindow(Gtk.ApplicationWindow):
             script = item["script"]
             if callable(script):
                 script = script()
-            self.run_script(script, root=False, label=item["name"])
+            self.run_script(script, root=False, label=tr_item(item)[0])
         elif kind == "shell":
             if item.get("danger") and not self.confirm(item):
                 return
             script = item["script"]
             if callable(script):
                 script = script()
-            self.run_script(script, root=item.get("root", False), label=item["name"])
+            self.run_script(script, root=item.get("root", False), label=tr_item(item)[0])
         elif kind == "file":
             self.run_file_chooser(item)
         elif kind == "form":
@@ -865,27 +868,27 @@ class LunuzWindow(Gtk.ApplicationWindow):
             self.run_script(script, root=item.get("root", False), label=item["name"])
         n = len(items)
         self.terminal.feed(
-            f"### Fila: {n} acao(oes) de «{cat['name']}» enfileirada(s).\r\n".encode()
+            f"### {t('batch_title', n=n, cat=tr_cat(cat))}\r\n".encode()
         )
-        self.set_status(f"{n} ações enfileiradas - veja a aba Terminal.")
+        self.set_status(t("queued_status", n=n, cmd=tr_cat(cat)))
         self.clear_selection()
 
     def confirm_batch(self, cat, items):
-        names = "\n".join(f"• {it['name']}" for it in items[:8])
+        names = "\n".join(f"• {tr_item(it)[0]}" for it in items[:8])
         if len(items) > 8:
-            names += f"\n... e mais {len(items) - 8}"
+            names += "\n" + t("batch_more", n=len(items) - 8)
         root_n = sum(1 for it in items if it.get("root"))
-        extra = f"\n\n{root_n} pedirão autenticação (senha de administrador)." if root_n else ""
+        extra = t("batch_root", root=root_n) if root_n else ""
         dlg = Gtk.MessageDialog(
             transient_for=self,
             flags=0,
             message_type=Gtk.MessageType.WARNING,
             buttons=Gtk.ButtonsType.NONE,
-            text=f"Executar {len(items)} ação(oes) de «{cat['name']}»?",
+            text=t("batch_title", n=len(items), cat=tr_cat(cat)),
         )
         dlg.format_secondary_text(names + extra)
-        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        dlg.add_button("Executar todas", Gtk.ResponseType.OK)
+        dlg.add_button(t("cancel_btn"), Gtk.ResponseType.CANCEL)
+        dlg.add_button(t("run_all_btn"), Gtk.ResponseType.OK)
         dlg.set_default_response(Gtk.ResponseType.CANCEL)
         resp = dlg.run()
         dlg.destroy()
@@ -900,26 +903,26 @@ class LunuzWindow(Gtk.ApplicationWindow):
             transient_for=self, flags=0,
             message_type=Gtk.MessageType.INFO,
             buttons=Gtk.ButtonsType.OK,
-            text=f"«{item['name']}» não está disponível nesta distro",
+            text=t("unavail_title", name=tr_item(item)[0]),
         )
         atual = f"{det['name']} {det.get('version', '')}".strip()
         dlg.format_secondary_text(
-            f"Disponível em: {fams}\nDetectado: {atual}"
+            t("unavail_body", fams=fams, detected=atual)
         )
         dlg.run()
         dlg.destroy()
 
     def confirm(self, item):
+        tail = t("confirm_tail_reboot") if item.get("root") else t("confirm_tail_period")
         dlg = Gtk.MessageDialog(
             transient_for=self,
             flags=0,
             message_type=Gtk.MessageType.WARNING,
             buttons=Gtk.ButtonsType.NONE,
-            text=f"Executar: {item['name']}?",
+            text=t("confirm_title", name=tr_item(item)[0]),
         )
         dlg.format_secondary_text(
-            f"{item['desc']}\n\nEsta ação modifica o sistema"
-            + (" e pode exigir reinicialização." if item.get("root") else ".")
+            t("confirm_body", desc=tr_item(item)[1], tail=tail)
         )
         # ícone colorido do item na confirmação (estilo LinuxToys)
         cimg = item_icon_image(item, 48)
@@ -929,8 +932,8 @@ class LunuzWindow(Gtk.ApplicationWindow):
                 dlg.set_image_visible(True)
             except Exception:
                 pass
-        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        dlg.add_button("Executar", Gtk.ResponseType.OK)
+        dlg.add_button(t("cancel_btn"), Gtk.ResponseType.CANCEL)
+        dlg.add_button(t("run_btn"), Gtk.ResponseType.OK)
         dlg.set_default_response(Gtk.ResponseType.CANCEL)
         resp = dlg.run()
         dlg.destroy()
@@ -957,9 +960,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
 
         if root:
             if not _which("pkexec"):
-                self.terminal.feed(
-                    b"\r\nERRO: pkexec nao encontrado. Instale policykit-1/polkit.\r\n"
-                )
+                self.terminal.feed(t("pkexec_missing").encode())
                 os.remove(path)
                 return
             argv = ["pkexec", "/bin/bash", path]
@@ -971,12 +972,12 @@ class LunuzWindow(Gtk.ApplicationWindow):
 
     def run_file_chooser(self, item):
         dlg = Gtk.FileChooserDialog(
-            title=f"Selecionar arquivo - {item['name']}",
+            title=t("filedlg_title", name=tr_item(item)[0]),
             parent=self,
             action=Gtk.FileChooserAction.OPEN,
         )
-        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        dlg.add_button("Abrir", Gtk.ResponseType.OK)
+        dlg.add_button(t("cancel_btn"), Gtk.ResponseType.CANCEL)
+        dlg.add_button(t("open_btn"), Gtk.ResponseType.OK)
         filt = Gtk.FileFilter()
         patt = item.get("filter", "*")
         for p in patt.split():
@@ -992,8 +993,8 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.run_argv(argv, f"lunuz {item['tool']} {path}")
 
     def run_form(self, item):
-        dlg = Gtk.Dialog(title=item["name"], transient_for=self, flags=0)
-        dlg.add_buttons("Cancelar", Gtk.ResponseType.CANCEL, "Executar", Gtk.ResponseType.OK)
+        dlg = Gtk.Dialog(title=tr_item(item)[0], transient_for=self, flags=0)
+        dlg.add_buttons(t("cancel_btn"), Gtk.ResponseType.CANCEL, t("run_btn"), Gtk.ResponseType.OK)
         dlg.set_default_response(Gtk.ResponseType.OK)
         grid = Gtk.Grid()
         grid.set_row_spacing(8)
@@ -1001,7 +1002,7 @@ class LunuzWindow(Gtk.ApplicationWindow):
         grid.set_border_width(12)
         entries = []
         for i, (label, default) in enumerate(item.get("fields", [])):
-            lbl = Gtk.Label(label=f"{label}:")
+            lbl = Gtk.Label(label=tr_field(label) + ":")
             lbl.set_xalign(1)
             ent = Gtk.Entry()
             ent.set_text(default)
@@ -1036,8 +1037,8 @@ class LunuzWindow(Gtk.ApplicationWindow):
         if self.running:
             self.run_queue.append((argv, pretty))
             n = len(self.run_queue)
-            self.set_status(f"Na fila ({n} pendente(s)): {cmd}")
-            self.terminal.feed(f"... na fila ({n}): {cmd}\r\n".encode())
+            self.set_status(t("queued_status", n=n, cmd=cmd))
+            self.terminal.feed(t("queued_term", n=n, cmd=cmd).encode())
             return
         self._spawn(argv, pretty)
 
@@ -1047,9 +1048,9 @@ class LunuzWindow(Gtk.ApplicationWindow):
         self.terminal.feed(f"\r\n$ {cmd}\r\n".encode())
         if self.batch:
             step = self.batch["done"] + 1
-            self.set_status(f"Executando {step}/{self.batch['total']}: {cmd}")
+            self.set_status(t("executing_step", step=step, total=self.batch["total"], cmd=cmd))
         else:
-            self.set_status(f"Executando: {cmd}")
+            self.set_status(t("executing", cmd=cmd))
         self.spinner.start()
         # Garante que filhos "python3 -m lunuz" achem o pacote mesmo quando o
         # ambiente pai nao possui PYTHONPATH (execucao direta do gui.py)
@@ -1073,8 +1074,8 @@ class LunuzWindow(Gtk.ApplicationWindow):
         except Exception as e:
             self.running = False
             self.spinner.stop()
-            self.set_status(f"Erro ao iniciar: {e}")
-            self.terminal.feed(f"erro ao executar: {e}\r\n".encode())
+            self.set_status(t("spawn_fail_status", err=e))
+            self.terminal.feed(t("spawn_error", err=e).encode() + b"\r\n")
 
     def on_child_exited(self, _term, status):
         self.running = False
@@ -1090,24 +1091,105 @@ class LunuzWindow(Gtk.ApplicationWindow):
         if self.run_queue:
             nxt = self.run_queue.pop(0)
             if self.batch:
-                self.set_status(
-                    f"Etapa {self.batch['done']}/{self.batch['total']} ok (código {code}) - próxima..."
-                )
+                self.set_status(t("step_ok_next", done=self.batch["done"],
+                                  total=self.batch["total"], code=code))
             else:
-                self.set_status(f"Anterior ok (código {code}) - próxima da fila...")
+                self.set_status(t("prev_ok_next", code=code))
             self._spawn(*nxt)
             return
         if self.batch:
             info = self.batch
             self.batch = None
-            self.set_status(
-                f"Fila concluída: {info['done']}/{info['total']} ações (último código {code})."
-            )
+            self.set_status(t("queue_done", done=info["done"], total=info["total"], code=code))
         elif code == 0:
-            self.set_status("Concluído com sucesso.")
+            self.set_status(t("done_ok"))
         else:
-            self.set_status(f"Finalizado com código {code} - verifique o terminal.")
-        self.terminal.feed(f"[fim, código {code}]\r\n".encode())
+            self.set_status(t("done_code", code=code))
+        self.terminal.feed(t("term_end", code=code).encode() + b"\r\n")
+
+    # ------------------------------------------------------------------
+    # Configurações (engrenagem): idioma
+    # ------------------------------------------------------------------
+    def _footer_markup(self):
+        readme = _readme_uri()
+        return (
+            '<span size="small">   <a href="%s">%s</a>'
+            '   |   <a href="https://github.com/DAVIB3BR/Linuz-Tools/issues">%s</a>'
+            '   |   <a href="https://github.com/DAVIB3BR/Linuz-Tools">%s</a>'
+            '   |   <a href="https://github.com/DAVIB3BR/Linuz-Tools">%s</a>   </span>'
+            % (readme, t("footer_wiki"), t("footer_bug"),
+               t("footer_dev"), t("footer_support"))
+        )
+
+    def _build_settings_popover(self):
+        """Popover com a selecao de idioma (auto + 11 idiomas)."""
+        pop = Gtk.Popover()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_border_width(12)
+        lbl = Gtk.Label()
+        lbl.set_markup(f"<b>{t('settings_title')}</b>")
+        lbl.set_xalign(0)
+        box.pack_start(lbl, False, False, 0)
+        box.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+        lang_lbl = Gtk.Label(t("settings_language"))
+        lang_lbl.set_xalign(0)
+        lang_lbl.get_style_context().add_class("dim-label")
+        box.pack_start(lang_lbl, False, False, 0)
+
+        current = get_language_setting()
+        sys_lang = language_display_name(detect_system_language())
+        group = Gtk.RadioButton(label=f'{t("auto_lang")}  ·  {sys_lang}')
+        group.set_active(current == "auto")
+        group.connect("toggled", self._on_lang_selected, "auto")
+        box.pack_start(group, False, False, 0)
+        for code, name, flag in LANGUAGES:
+            btn = Gtk.RadioButton.new_from_widget(group)
+            btn.set_label(f"{flag} {name}")
+            btn.set_active(current == code)
+            btn.connect("toggled", self._on_lang_selected, code)
+            box.pack_start(btn, False, False, 0)
+
+        note = Gtk.Label()
+        note.set_xalign(0)
+        note.get_style_context().add_class("dim-label")
+        note.set_markup('<span size="small">%s</span>'
+                        % GLib.markup_escape_text(t("syslang_note", lang=sys_lang)))
+        box.pack_start(note, False, False, 0)
+        box.show_all()
+        pop.add(box)
+        return pop
+
+    def _on_lang_selected(self, btn, value):
+        if not btn.get_active():
+            return
+        if get_language_setting() == value:
+            return
+        set_language(value)
+        self.apply_language()
+        msg = t("lang_saved", lang=language_display_name(get_language()))
+        self.set_status(msg)
+        self.terminal.feed(f"### {msg}\r\n".encode())
+
+    def apply_language(self):
+        """Reaplica todos os textos da interface no idioma atual (ao vivo)."""
+        self.back_btn.set_tooltip_text(t("back_tooltip"))
+        self.search.set_placeholder_text(t("search_placeholder"))
+        self.btn_grid.set_tooltip_text(t("grid_tooltip"))
+        self.btn_list.set_tooltip_text(t("list_tooltip"))
+        self.gear_btn.set_tooltip_text(t("settings_tooltip"))
+        self.gear_btn.set_popover(self._build_settings_popover())
+        self.term_title_lbl.set_markup(f"<b>{t('terminal_title')}</b>")
+        self.tclear.set_tooltip_text(t("clear_terminal"))
+        self.term_lbl.set_markup(f"<b>{t('terminal_plain')}</b>")
+        self.clear_btn.set_tooltip_text(t("clear_terminal"))
+        self.bot_hint.set_markup(t("bottom_hint"))
+        self.footer_lbl.set_markup(self._footer_markup())
+        self.build_home()
+        visible = self.stack.get_visible_child_name()
+        if visible == "category" and self.current_cat is not None:
+            self.open_category(self.current_cat, reset_scroll=False)
+        elif visible == "search" and self.search.get_text().strip():
+            self.on_search(self.search)
 
     # ------------------------------------------------------------------
     def on_link(self, _label, uri):

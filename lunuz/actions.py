@@ -2208,6 +2208,7 @@ def item_available(item, family=None):
 
 def distro_report(list_available=False):
     """Relatório textual do identificador de distro + ações disponíveis."""
+    from .i18n import t, tr_cat, tr_item
     d = detect_distro()
     fam = d["family"]
     items = [it for cat in CATEGORIES for it in cat["items"]]
@@ -2215,29 +2216,29 @@ def distro_report(list_available=False):
     blocked = [it for it in items if not item_available(it, fam)]
     nome = d["name"] + (f" {d['version']}" if d["version"] else "")
     linhas = [
-        "lunuz tools - identificador de distro",
-        "=====================================",
-        f"Sistema:  {nome}",
-        f"ID:       {d['id']}",
-        f"Familia:  {FAMILY_NAMES.get(fam, fam)} ({fam})",
-        f"Pacotes:  {PKG_MGRS.get(fam, '-')}",
-        f"Acoes:    {len(items)} total - {len(avail)} disponiveis aqui, "
-        f"{len(blocked)} indisponiveis",
+        t("report_title"),
+        t("report_sep"),
+        f"{t('r_system')}  {nome}",
+        f"{t('r_id')}       {d['id']}",
+        f"{t('r_family')}  {FAMILY_NAMES.get(fam, fam)} ({fam})",
+        f"{t('r_pkgs')}  {PKG_MGRS.get(fam, '-')}",
+        f"{t('r_actions')}    " + t("r_actions_line", total=len(items),
+                                    ok=len(avail), blocked=len(blocked)),
     ]
     if blocked:
         linhas.append("")
-        linhas.append("Indisponiveis nesta distro:")
+        linhas.append(t("r_blocked"))
         for it in blocked:
             fams = ", ".join(FAMILY_NAMES.get(f, f) for f in available_families(it))
-            linhas.append(f"  - {it['name']}  (so em: {fams})")
+            linhas.append(t("r_only_in", name=tr_item(it)[0], fams=fams))
     if list_available:
         linhas.append("")
-        linhas.append(f"Disponiveis aqui ({len(avail)}):")
+        linhas.append(t("r_avail", n=len(avail)))
         for it in avail:
-            linhas.append(f"  - [{it['id']}] {it['name']}")
+            linhas.append(t("r_item", id=it["id"], name=tr_item(it)[0]))
     elif blocked:
         linhas.append("")
-        linhas.append("Use `lunuz distro --list` para listar as acoes disponiveis.")
+        linhas.append(t("r_hint"))
     return "\n".join(linhas)
 
 

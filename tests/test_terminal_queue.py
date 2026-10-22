@@ -5,6 +5,8 @@ progresso e contagem de lote (seleção múltipla).
 """
 import os
 import sys
+import os
+os.environ.setdefault("LUNUZ_LANG", "pt_BR")  # testes deterministicos: textos em pt_BR
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lunuz import gui
 from gi.repository import Gtk, GLib, Vte

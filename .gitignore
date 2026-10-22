@@ -1,0 +1,15 @@
+# Bytecode do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Artefatos temporarios dos icones
+.glyph-tmp.png
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# Backups de editor
+*.swp
+*~
