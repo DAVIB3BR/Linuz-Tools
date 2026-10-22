@@ -562,6 +562,7 @@ def build_kernel_xanmod():
     if d["family"] == "debian":
         return (
             "set -e\n"
+            "apt update\n"
             "apt install -y wget gpg\n"
             "wget -qO- https://dl.xanmod.org/gpg.key | gpg --dearmor -o /usr/share/keyrings/xanmod-archive-keyring.gpg\n"
             "echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://dl.xanmod.org/repo deb main' "
@@ -596,6 +597,7 @@ def build_kernel_liquorix():
     if d["family"] == "debian":
         return (
             "set -e\n"
+            "apt update\n"
             "apt install -y curl gpg\n"
             "curl -fsSL 'https://deb.liquorix.net/linux-liquorix.gpg' | "
             "gpg --dearmor -o /etc/apt/trusted.gpg.d/liquorix.gpg\n"
@@ -630,7 +632,7 @@ def build_kernel_rt():
     if d["family"] == "fedora":
         return (
             "set -e\n"
-            "dnf copr enable -y copr:copr.fedorainfracloud.org/syzdalsky/rt || true\n"
+            "dnf copr enable -y syzdalsky/rt || true\n"
             "dnf install -y kernel-rt 2>/dev/null || "
             "echo 'kernel-rt nao disponivel. Habilite updates-realtime: https://fedoraproject.org/wiki/Changes/Kernel_RT'\n"
         )
@@ -1022,6 +1024,7 @@ def _ensure_flatpak():
     """Garante flatpak + Flathub instalados (bootstrap por distro)."""
     return (
         "if ! command -v flatpak >/dev/null 2>&1; then\n"
+        "  apt update 2>/dev/null || pacman -Sy 2>/dev/null || dnf makecache 2>/dev/null || zypper refresh 2>/dev/null || true\n"
         "  " + pkg_install(["flatpak"]) + "\n"
         "fi\n"
         "flatpak remote-add --if-not-exists flathub "
@@ -1127,7 +1130,7 @@ def build_sublime():
             "| gpg --dearmor > /etc/pacman.d/gnupg/sublimehq-pacmand.gpg\n"
             "grep -q '\\[sublimehq-pacman\\]' /etc/pacman.conf || "
             "{ echo ''; echo '[sublimehq-pacman]'; "
-            "echo 'SigLevel = Required Optional trusted=only'; "
+            "echo 'SigLevel = Optional TrustAll'; "
             "echo 'Include = /etc/pacman.d/gnupg/sublimehq-pacmand.gpg'; } >> /etc/pacman.conf\n"
             "pacman -Sy --noconfirm sublime-text\n"
         )
@@ -1198,7 +1201,16 @@ def build_aider():
     return (
         "set -e\n"
         "if ! command -v pipx >/dev/null 2>&1; then\n"
-        "  sudo " + pkg_install(["pipx"]) + "\n"
+        "  echo 'pipx nao encontrado - instalando...'\n"
+        "  if [ \"$(id -u)\" = 0 ]; then\n"
+        "    " + pkg_install(["pipx"]) + "\n"
+        "  elif command -v sudo >/dev/null 2>&1; then\n"
+        "    sudo " + pkg_install(["pipx"]) + "\n"
+        "  elif command -v pkexec >/dev/null 2>&1; then\n"
+        "    pkexec " + pkg_install(["pipx"]) + "\n"
+        "  else\n"
+        "    " + pkg_install(["pipx"]) + " || true\n"
+        "  fi\n"
         "fi\n"
         "pipx install aider-chat || "
         "python3 -m pip install --user --break-system-packages aider-chat\n"
@@ -1570,7 +1582,7 @@ def _itens_ide():
          "script": lambda: build_flatpak_app("com.jetbrains.IntelliJ-IDEA-IC", "IntelliJ IDEA")},
         {"id": "ide-pycharm", "name": "PyCharm Community", "desc": "IDE para Python (Flathub)",
          "kind": "shell", "root": True, "danger": False,
-         "script": lambda: build_flatpak_app("com.jetbrains.PyCharm-CE-Personal", "PyCharm")},
+         "script": lambda: build_flatpak_app("com.jetbrains.PyCharm-Community", "PyCharm")},
         {"id": "ide-eclipse", "name": "Eclipse", "desc": "IDE clássica multi-linguagem (Flathub)",
          "kind": "shell", "root": True, "danger": False,
          "script": lambda: build_flatpak_app("org.eclipse.EclipseIDE", "Eclipse")},
