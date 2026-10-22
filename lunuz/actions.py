@@ -59,6 +59,83 @@ def _fam():
     return detect_distro()["family"]
 
 
+# ------------------------------------------------------------------
+# ADIÇÃO AUTOMÁTICA DE REPOSITÓRIOS
+# Fragmentos bash idempotentes: quando um driver/kernel/aplicativo
+# precisa de um repositório que não existe, o script adiciona o
+# repositório sozinho antes de instalar.
+# ------------------------------------------------------------------
+def _debian_nonfree_block():
+    """Garante contrib/non-free/non-free-firmware (Debian) e
+    universe/multiverse/restricted (Ubuntu) - necessário p/ NVIDIA,
+    steam-installer, firmwares etc. NÃO faz nada se já habilitado."""
+    return (
+        "# --- garantindo repositorios non-free/contrib (automatico) ---\n"
+        "if [ -f /etc/debian_version ] && ! grep -rqs -e 'non-free' -e 'multiverse' "
+        "/etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then\n"
+        "  echo 'Repositorios non-free/multiverse ausentes - habilitando automaticamente...'\n"
+        "  if [ -f /etc/apt/sources.list.d/debian.sources ]; then\n"
+        "    sed -i 's/^Components: .*/Components: main contrib non-free non-free-firmware/' "
+        "/etc/apt/sources.list.d/debian.sources\n"
+        "  fi\n"
+        "  if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then\n"
+        "    grep -q multiverse /etc/apt/sources.list.d/ubuntu.sources || "
+        "sed -i 's/^Components: .*/& multiverse/' /etc/apt/sources.list.d/ubuntu.sources\n"
+        "  fi\n"
+        "  if [ -f /etc/apt/sources.list ] && grep -q '^deb ' /etc/apt/sources.list; then\n"
+        "    grep -q 'non-free' /etc/apt/sources.list || "
+        "sed -i 's/^deb \\([^#]*\\) main$/deb \\1 main contrib non-free non-free-firmware/' "
+        "/etc/apt/sources.list\n"
+        "  fi\n"
+        "  command -v add-apt-repository >/dev/null 2>&1 && { "
+        "add-apt-repository -y multiverse 2>/dev/null || true; "
+        "add-apt-repository -y universe 2>/dev/null || true; "
+        "add-apt-repository -y restricted 2>/dev/null || true; }\n"
+        "  apt update\n"
+        "fi\n"
+    )
+
+
+def _rpmfusion_block():
+    """Garante RPM Fusion (free + nonfree) no Fedora/RHEL quando ausente."""
+    return (
+        "# --- garantindo RPM Fusion (automatico) ---\n"
+        "if command -v dnf >/dev/null 2>&1 && ! rpm -q rpmfusion-free-release >/dev/null 2>&1; then\n"
+        "  echo 'RPM Fusion ausente - adicionando repositorios automaticamente...'\n"
+        "  dnf install -y 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm' || true\n"
+        "  dnf install -y 'https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm' || true\n"
+        "fi\n"
+    )
+
+
+def _arch_multilib_block():
+    """Garante o repositorio [multilib] no Arch/Manjaro quando ausente
+    (necessario para Steam, Wine, lib32-mesa, lib32-vulkan...)."""
+    return (
+        "# --- garantindo repositorio multilib (automatico) ---\n"
+        "if command -v pacman >/dev/null 2>&1 && ! grep -q '^\\[multilib\\]' /etc/pacman.conf; then\n"
+        "  echo 'Repositorio multilib ausente - habilitando automaticamente...'\n"
+        "  sed -i '/^#\\[multilib\\]/,/^#Include/ s/^#//' /etc/pacman.conf\n"
+        "  pacman -Sy --noconfirm\n"
+        "fi\n"
+    )
+
+
+def _suse_packman_block():
+    """Garante o repositorio Packman no openSUSE quando ausente
+    (necessario para codecs, Steam e Wine completos)."""
+    return (
+        "# --- garantindo repositorio Packman (automatico) ---\n"
+        "if command -v zypper >/dev/null 2>&1 && ! zypper lr 2>/dev/null | grep -qi packman; then\n"
+        "  . /etc/os-release\n"
+        "  echo 'Packman ausente - adicionando repositorio automaticamente...'\n"
+        "  zypper --non-interactive addrepo -cfp 90 "
+        "\"https://packman.inode.at/suse/openSUSE_${VERSION_ID}/\" packman || true\n"
+        "  zypper --non-interactive refresh\n"
+        "fi\n"
+    )
+
+
 # ==================================================================
 # BUILDERS DE SCRIPTS (drivers)
 # ==================================================================
@@ -68,15 +145,16 @@ def build_nvidia():
         if "ubuntu" in d["id"] or "mint" in d["id"]:
             return (
                 "set -e\n"
-                "apt update\n"
+                + _debian_nonfree_block()
+                + "apt update\n"
                 "apt install -y ubuntu-drivers-common\n"
                 "ubuntu-drivers autoinstall\n"
                 "echo 'Driver NVIDIA instalado. REINICIE o computador.'\n"
             )
         return (
             "set -e\n"
-            "apt update\n"
-            "apt install -y firmware-misc-nonfree 2>/dev/null || true\n"
+            + _debian_nonfree_block()
+            + "apt update\n"
             "apt install -y nvidia-driver\n"
             "update-initramfs -u\n"
             "echo 'Driver NVIDIA instalado. REINICIE o computador.'\n"
@@ -84,8 +162,8 @@ def build_nvidia():
     if d["family"] == "fedora":
         return (
             "set -e\n"
-            "dnf install -y 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm'\n"
-            "dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda\n"
+            + _rpmfusion_block()
+            + "dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda\n"
             "akmods --force\n"
             "dracut -f\n"
             "echo 'Driver NVIDIA (RPM Fusion) instalado. REINICIE o computador.'\n"
@@ -118,7 +196,8 @@ def build_nvidia_fix():
     if d["family"] == "debian":
         return (
             "set -e\n"
-            "echo '== Limpando instalacao anterior =='\n"
+            + _debian_nonfree_block()
+            + "echo '== Limpando instalacao anterior =='\n"
             "apt update\n"
             "apt install -y --reinstall nvidia-driver 2>/dev/null || apt install -y nvidia-driver\n"
             "echo '== Removendo xorg.conf problematico =='\n"
@@ -159,7 +238,8 @@ def build_nouveau_restore():
     if d["family"] == "debian":
         return (
             "set -e\n"
-            "apt update\n"
+            + _debian_nonfree_block()
+            + "apt update\n"
             "apt purge -y 'nvidia-*' 2>/dev/null || true\n"
             "apt install -y xserver-xorg-video-nouveau firmware-misc-nonfree || apt install -y xserver-xorg-video-nouveau\n"
             "rm -f /etc/modprobe.d/blacklist-nouveau.conf /etc/modprobe.d/blacklist.conf\n"
@@ -212,7 +292,8 @@ def build_amd():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon "
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon "
             "xf86-video-amdgpu\n"
             "echo 'Driver AMD/Radeon (Mesa) atualizado. REINICIE.'\n"
         )
@@ -245,7 +326,8 @@ def build_intel():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm mesa lib32-mesa vulkan-intel lib32-vulkan-intel "
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm mesa lib32-mesa vulkan-intel lib32-vulkan-intel "
             "xf86-video-intel\n"
             "echo 'Driver Intel atualizado. REINICIE.'\n"
         )
@@ -574,16 +656,17 @@ def build_kernel_xanmod():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm git base-devel\n"
-            "rm -rf /tmp/chaotic-aur\n"
-            "mkdir -p /etc/pacman.d/keys\n"
+            "echo 'Habilitando repositorio chaotic-aur (chaves + mirrorlist automaticos)...'\n"
             "pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || true\n"
             "pacman-key --lsign-key 3056513887B78AEB || true\n"
+            "pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' "
+            "'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' || true\n"
             "grep -q chaotic-aur /etc/pacman.conf || "
-            "echo '[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf\n"
-            "echo 'Repo chaotic-aur habilitado (pacote linux-xanmod a partir do AUR).' \n"
+            "printf '\\n[chaotic-aur]\\nInclude = /etc/pacman.d/chaotic-mirrorlist\\n' >> /etc/pacman.conf\n"
             "pacman -Sy\n"
-            "echo 'Instale pelo AUR: paru -S linux-xanmod (se tiver um AUR helper).'\n"
+            "echo 'Repo chaotic-aur habilitado automaticamente.'\n"
+            "pacman -S --noconfirm linux-xanmod 2>/dev/null || "
+            "echo 'Instale com: pacman -S linux-xanmod (ja disponivel no chaotic-aur).'\n"
         )
     return (
         "echo 'XanMod oficial suporta Debian/Ubuntu.'\n"
@@ -603,8 +686,8 @@ def build_kernel_liquorix():
             "gpg --dearmor -o /etc/apt/trusted.gpg.d/liquorix.gpg\n"
             "CODENAME=$(. /etc/os-release && echo \"$VERSION_CODENAME\")\n"
             "echo \"deb https://deb.liquorix.net/ $CODENAME main\" > /etc/apt/sources.list.d/liquorix.list\n"
-            "apt update\n"
-            "apt install -y liquorix-generic\n"
+            "apt update || echo 'Aviso: repositorio Liquorix pode nao ter pacotes para este codinome.'\n"
+            "apt install -y liquorix-generic || echo 'liquorix-generic indisponivel para $CODENAME - veja https://liquorix.net'\n"
             "echo 'Kernel Liquorix instalado. REINICIE.'\n"
         )
     if d["family"] == "arch":
