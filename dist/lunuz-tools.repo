@@ -1,5 +1,5 @@
 [lunuz-tools]
 name=lunuz tools - $basearch
-baseurl=https://github.com/davi/lunuz-tools/releases/latest/rpm
+baseurl=https://github.com/DAVIB3BR/Linuz-Tools/releases/latest/rpm
 enabled=0
 gpgcheck=0

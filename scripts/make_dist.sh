@@ -56,7 +56,20 @@ echo "  - tar / tar.gz / tar.bz2 / tar.xz / tar.zst / zip"
 ( cd "$STAGE" && tar -cjf        "$DIST/lunuz-tools-$VER.tar.bz2"      "lunuz-tools-$VER" )
 ( cd "$STAGE" && tar -cJf        "$DIST/lunuz-tools-$VER.tar.xz"       "lunuz-tools-$VER" )
 ( cd "$STAGE" && tar --zstd -cf  "$DIST/lunuz-tools-$VER.tar.zst"      "lunuz-tools-$VER" )
-( cd "$STAGE" && zip -qr         "$DIST/lunuz-tools-$VER.zip"          "lunuz-tools-$VER" )
+if command -v zip >/dev/null 2>&1; then
+  ( cd "$STAGE" && zip -qr       "$DIST/lunuz-tools-$VER.zip"          "lunuz-tools-$VER" )
+else
+  # fallback sem o binario zip: usa o modulo zipfile do Python
+  python3 - "$STAGE/lunuz-tools-$VER" "$DIST/lunuz-tools-$VER.zip" <<'PYZIP'
+import os, sys, zipfile
+src, out = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+    for root, _dirs, files in os.walk(src):
+        for f in files:
+            p = os.path.join(root, f)
+            zf.write(p, os.path.relpath(p, os.path.dirname(src)))
+PYZIP
+fi
 
 # ------------------------------------------------------------------
 # 4) .deb (Debian/Ubuntu)
@@ -81,8 +94,34 @@ Description: lunuz tools - CLI utilities with a LinuxToys-style GUI
 CTRL
   dpkg-deb --build --root-owner-group "$ROOTFS" "$DIST/${NAME}_${VER}_all.deb" >/dev/null
   rm -rf "$ROOTFS/DEBIAN"
+elif command -v ar >/dev/null 2>&1; then
+  # fallback sem dpkg-deb: monta o .deb na mao (ar + tars)
+  echo "  - deb (fallback ar)"
+  mkdir -p "$ROOTFS/DEBIAN"
+  ISIZE=$(du -sk "$ROOTFS/usr" | cut -f1)
+  cat > "$ROOTFS/DEBIAN/control" <<CTRL
+Package: lunuz-tools
+Version: $VER
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-vte-2.91
+Maintainer: Davi <davi@localhost>
+Installed-Size: $ISIZE
+Description: lunuz tools - CLI utilities with a LinuxToys-style GUI
+ A collection of command line utilities (ls, grep, find, chmod, java,
+ cpp, python, node...) plus a GTK interface with drivers, repositories,
+ kernels, optimization, IDEs and programming language installers.
+CTRL
+  DSTAGE="$STAGE/debstage"
+  mkdir -p "$DSTAGE"
+  echo "2.0" > "$DSTAGE/debian-binary"
+  ( cd "$ROOTFS/DEBIAN" && tar --owner=0 --group=0 -czf "$DSTAGE/control.tar.gz" . )
+  ( cd "$ROOTFS" && tar --owner=0 --group=0 -czf "$DSTAGE/data.tar.gz" ./usr )
+  ( cd "$DSTAGE" && ar -r "$DIST/${NAME}_${VER}_all.deb" debian-binary control.tar.gz data.tar.gz >/dev/null )
+  rm -rf "$DSTAGE" "$ROOTFS/DEBIAN"
 else
-  echo "  ! dpkg-deb ausente - .deb pulado"
+  echo "  ! dpkg-deb e ar ausentes - .deb pulado"
 fi
 
 # ------------------------------------------------------------------
@@ -98,7 +137,7 @@ Version: $VER
 Release: 1
 Summary: CLI utilities with a LinuxToys-style GUI
 License: Unspecified
-URL: https://github.com/davi/lunuz-tools
+URL: https://github.com/DAVIB3BR/Linuz-Tools
 AutoReqProv: no
 BuildArch: noarch
 Requires: python3, python3-gobject, gtk3, vte291
@@ -140,7 +179,7 @@ cat > "$PKGDIR/.PKGINFO" <<PI
 pkgname = $NAME
 pkgver = $VER-1
 pkgdesc = CLI utilities with a LinuxToys-style GUI
-url = https://github.com/davi/lunuz-tools
+url = https://github.com/DAVIB3BR/Linuz-Tools
 builddate = $(date +%s)
 packager = Davi
 size = $SIZE
@@ -163,7 +202,7 @@ cp "$ROOT/snapcraft.yaml" "$DIST/"
 cat > "$DIST/lunuz-tools.repo" <<REPO
 [lunuz-tools]
 name=lunuz tools - \$basearch
-baseurl=https://github.com/davi/lunuz-tools/releases/latest/rpm
+baseurl=https://github.com/DAVIB3BR/Linuz-Tools/releases/latest/rpm
 enabled=0
 gpgcheck=0
 REPO
@@ -190,10 +229,17 @@ TXT
 rm -rf "$STAGE" "$DIST/rpmbuild"
 
 echo "== verificacao =="
-[ -f "$DIST/${NAME}_${VER}_all.deb" ] && { dpkg-deb --info "$DIST/${NAME}_${VER}_all.deb" | sed -n '3,7p'; echo "   arquivos: $(dpkg-deb --contents "$DIST/${NAME}_${VER}_all.deb" | wc -l)"; } || true
+if [ -f "$DIST/${NAME}_${VER}_all.deb" ]; then
+  if command -v dpkg-deb >/dev/null 2>&1; then
+    dpkg-deb --info "$DIST/${NAME}_${VER}_all.deb" | sed -n '3,7p'
+    echo "   arquivos: $(dpkg-deb --contents "$DIST/${NAME}_${VER}_all.deb" | wc -l)"
+  else
+    echo "   deb: $(ar t "$DIST/${NAME}_${VER}_all.deb" | tr '\n' ' ')"
+  fi
+fi
 [ -f "$DIST/${NAME}-${VER}-1.noarch.rpm" ] && { rpm -qp --info "$DIST/${NAME}-${VER}-1.noarch.rpm" | sed -n '1,6p'; echo "   arquivos: $(rpm -qlp "$DIST/${NAME}-${VER}-1.noarch.rpm" | wc -l)"; } || true
 echo "   pkg arch: $(tar --zstd -tf "$DIST/${NAME}-${VER}-1-any.pkg.tar.zst" | wc -l) arquivos"
-echo "   zip:      $(unzip -l "$DIST/lunuz-tools-$VER.zip" | tail -1)"
+echo "   zip:      $(python3 -c "import zipfile,sys; print(len(zipfile.ZipFile(sys.argv[1]).namelist()), 'arquivos')" "$DIST/lunuz-tools-$VER.zip" 2>/dev/null || echo '(ok)')"
 
 echo
 echo "OK - pacotes em $DIST:"

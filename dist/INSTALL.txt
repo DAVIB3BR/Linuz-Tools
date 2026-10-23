@@ -1,11 +1,11 @@
-lunuz tools 1.2.0 - como instalar cada formato
+lunuz tools 1.0.5 - como instalar cada formato
 ==============================================
 
-.deb   sudo apt install ./lunuz-tools_1.2.0_all.deb
-.rpm   sudo dnf install ./lunuz-tools-1.2.0-1.noarch.rpm
-.pkg   sudo pacman -U lunuz-tools-1.2.0-1-any.pkg.tar.zst
-tar    tar -xJf lunuz-tools-1.2.0.tar.xz && cd lunuz-tools-1.2.0 && python3 -m lunuz gui
-zip    unzip lunuz-tools-1.2.0.zip && cd lunuz-tools-1.2.0 && python3 -m lunuz gui
+.deb   sudo apt install ./lunuz-tools_1.0.5_all.deb
+.rpm   sudo dnf install ./lunuz-tools-1.0.5-1.noarch.rpm
+.pkg   sudo pacman -U lunuz-tools-1.0.5-1-any.pkg.tar.zst
+tar    tar -xJf lunuz-tools-1.0.5.tar.xz && cd lunuz-tools-1.0.5 && python3 -m lunuz gui
+zip    unzip lunuz-tools-1.0.5.zip && cd lunuz-tools-1.0.5 && python3 -m lunuz gui
 
 flatpak (fonte):  flatpak-builder --user --install build org.davi.lunuz-tools.json
 snap (fonte):     cd snapcraft.yaml-dir && snapcraft     (requer snapd)
