@@ -165,6 +165,22 @@ Pre-built artifacts live in `dist/` (build them yourself with
 | 🐞 Flatpak | `org.davi.lunuz-tools.json` | `flatpak-builder build org.davi.lunuz-tools.json` |
 | 🦑 Snap | `snapcraft.yaml` | `snapcraft` |
 
+### 🦾 ARM support (aarch64)
+
+lunuz is **100% Python** — the `all`/`noarch`/`any` packages run
+**natively on ARM64** (Raspberry Pi 4/5, Fedora ARM, Manjaro ARM...).
+The **`dist/arm/`** folder gathers everything:
+
+| Format | File in `dist/arm/` |
+|--------|---------------------|
+| 🖼️ **ARM64** AppImage | `linuz_tools-aarch64.AppImage` (official aarch64 runtime) |
+| 🧊 Debian/Ubuntu/RPi OS | `lunuz-tools_1.0.5_all.deb` |
+| 🎩 Fedora ARM | `lunuz-tools-1.0.5-1.noarch.rpm` |
+| 🎀 Arch/Manjaro ARM | `lunuz-tools-1.0.5-1-any.pkg.tar.zst` |
+| 📦 Source | `.tar.gz` `.tar.xz` `.zip` |
+
+> 📘 Full guide: [`dist/arm/LEIA-ME.md`](dist/arm/LEIA-ME.md)
+
 ### GUI dependencies
 
 | Distro | Packages |

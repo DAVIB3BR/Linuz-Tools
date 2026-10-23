@@ -165,6 +165,22 @@ Os pacotes ficam em `dist/` (gere você mesmo com `scripts/make_dist.sh`):
 | 🐞 Flatpak | `org.davi.lunuz-tools.json` | `flatpak-builder build org.davi.lunuz-tools.json` |
 | 🦑 Snap | `snapcraft.yaml` | `snapcraft` |
 
+### 🦾 Suporte ARM (aarch64)
+
+O lunuz é **100% Python** — os pacotes `all`/`noarch`/`any` rodam
+**nativamente em ARM64** (Raspberry Pi 4/5, Fedora ARM, Manjaro ARM...).
+A pasta **`dist/arm/`** concentra tudo:
+
+| Formato | Arquivo em `dist/arm/` |
+|---------|------------------------|
+| 🖼️ AppImage **ARM64** | `linuz_tools-aarch64.AppImage` (runtime oficial aarch64) |
+| 🧊 Debian/Ubuntu/RPi OS | `lunuz-tools_1.0.5_all.deb` |
+| 🎩 Fedora ARM | `lunuz-tools-1.0.5-1.noarch.rpm` |
+| 🎀 Arch/Manjaro ARM | `lunuz-tools-1.0.5-1-any.pkg.tar.zst` |
+| 📦 Fonte | `.tar.gz` `.tar.xz` `.zip` |
+
+> 📘 Guia completo: [`dist/arm/LEIA-ME.md`](dist/arm/LEIA-ME.md)
+
 ### Dependências da GUI
 
 | Distro | Pacotes |
