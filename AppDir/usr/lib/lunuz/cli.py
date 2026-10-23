@@ -8,7 +8,7 @@ import argparse
 try:
     from . import __version__
 except ImportError:
-    __version__ = "1.2.0"
+    __version__ = "1.0.5"
 
 
 def main():

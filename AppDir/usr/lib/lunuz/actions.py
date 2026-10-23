@@ -59,6 +59,83 @@ def _fam():
     return detect_distro()["family"]
 
 
+# ------------------------------------------------------------------
+# ADIÇÃO AUTOMÁTICA DE REPOSITÓRIOS
+# Fragmentos bash idempotentes: quando um driver/kernel/aplicativo
+# precisa de um repositório que não existe, o script adiciona o
+# repositório sozinho antes de instalar.
+# ------------------------------------------------------------------
+def _debian_nonfree_block():
+    """Garante contrib/non-free/non-free-firmware (Debian) e
+    universe/multiverse/restricted (Ubuntu) - necessário p/ NVIDIA,
+    steam-installer, firmwares etc. NÃO faz nada se já habilitado."""
+    return (
+        "# --- garantindo repositorios non-free/contrib (automatico) ---\n"
+        "if [ -f /etc/debian_version ] && ! grep -rqs -e 'non-free' -e 'multiverse' "
+        "/etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then\n"
+        "  echo 'Repositorios non-free/multiverse ausentes - habilitando automaticamente...'\n"
+        "  if [ -f /etc/apt/sources.list.d/debian.sources ]; then\n"
+        "    sed -i 's/^Components: .*/Components: main contrib non-free non-free-firmware/' "
+        "/etc/apt/sources.list.d/debian.sources\n"
+        "  fi\n"
+        "  if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then\n"
+        "    grep -q multiverse /etc/apt/sources.list.d/ubuntu.sources || "
+        "sed -i 's/^Components: .*/& multiverse/' /etc/apt/sources.list.d/ubuntu.sources\n"
+        "  fi\n"
+        "  if [ -f /etc/apt/sources.list ] && grep -q '^deb ' /etc/apt/sources.list; then\n"
+        "    grep -q 'non-free' /etc/apt/sources.list || "
+        "sed -i 's/^deb \\([^#]*\\) main$/deb \\1 main contrib non-free non-free-firmware/' "
+        "/etc/apt/sources.list\n"
+        "  fi\n"
+        "  command -v add-apt-repository >/dev/null 2>&1 && { "
+        "add-apt-repository -y multiverse 2>/dev/null || true; "
+        "add-apt-repository -y universe 2>/dev/null || true; "
+        "add-apt-repository -y restricted 2>/dev/null || true; }\n"
+        "  apt update\n"
+        "fi\n"
+    )
+
+
+def _rpmfusion_block():
+    """Garante RPM Fusion (free + nonfree) no Fedora/RHEL quando ausente."""
+    return (
+        "# --- garantindo RPM Fusion (automatico) ---\n"
+        "if command -v dnf >/dev/null 2>&1 && ! rpm -q rpmfusion-free-release >/dev/null 2>&1; then\n"
+        "  echo 'RPM Fusion ausente - adicionando repositorios automaticamente...'\n"
+        "  dnf install -y 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm' || true\n"
+        "  dnf install -y 'https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm' || true\n"
+        "fi\n"
+    )
+
+
+def _arch_multilib_block():
+    """Garante o repositorio [multilib] no Arch/Manjaro quando ausente
+    (necessario para Steam, Wine, lib32-mesa, lib32-vulkan...)."""
+    return (
+        "# --- garantindo repositorio multilib (automatico) ---\n"
+        "if command -v pacman >/dev/null 2>&1 && ! grep -q '^\\[multilib\\]' /etc/pacman.conf; then\n"
+        "  echo 'Repositorio multilib ausente - habilitando automaticamente...'\n"
+        "  sed -i '/^#\\[multilib\\]/,/^#Include/ s/^#//' /etc/pacman.conf\n"
+        "  pacman -Sy --noconfirm\n"
+        "fi\n"
+    )
+
+
+def _suse_packman_block():
+    """Garante o repositorio Packman no openSUSE quando ausente
+    (necessario para codecs, Steam e Wine completos)."""
+    return (
+        "# --- garantindo repositorio Packman (automatico) ---\n"
+        "if command -v zypper >/dev/null 2>&1 && ! zypper lr 2>/dev/null | grep -qi packman; then\n"
+        "  . /etc/os-release\n"
+        "  echo 'Packman ausente - adicionando repositorio automaticamente...'\n"
+        "  zypper --non-interactive addrepo -cfp 90 "
+        "\"https://packman.inode.at/suse/openSUSE_${VERSION_ID}/\" packman || true\n"
+        "  zypper --non-interactive refresh\n"
+        "fi\n"
+    )
+
+
 # ==================================================================
 # BUILDERS DE SCRIPTS (drivers)
 # ==================================================================
@@ -68,15 +145,16 @@ def build_nvidia():
         if "ubuntu" in d["id"] or "mint" in d["id"]:
             return (
                 "set -e\n"
-                "apt update\n"
+                + _debian_nonfree_block()
+                + "apt update\n"
                 "apt install -y ubuntu-drivers-common\n"
                 "ubuntu-drivers autoinstall\n"
                 "echo 'Driver NVIDIA instalado. REINICIE o computador.'\n"
             )
         return (
             "set -e\n"
-            "apt update\n"
-            "apt install -y firmware-misc-nonfree 2>/dev/null || true\n"
+            + _debian_nonfree_block()
+            + "apt update\n"
             "apt install -y nvidia-driver\n"
             "update-initramfs -u\n"
             "echo 'Driver NVIDIA instalado. REINICIE o computador.'\n"
@@ -84,8 +162,8 @@ def build_nvidia():
     if d["family"] == "fedora":
         return (
             "set -e\n"
-            "dnf install -y 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm'\n"
-            "dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda\n"
+            + _rpmfusion_block()
+            + "dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda\n"
             "akmods --force\n"
             "dracut -f\n"
             "echo 'Driver NVIDIA (RPM Fusion) instalado. REINICIE o computador.'\n"
@@ -118,7 +196,8 @@ def build_nvidia_fix():
     if d["family"] == "debian":
         return (
             "set -e\n"
-            "echo '== Limpando instalacao anterior =='\n"
+            + _debian_nonfree_block()
+            + "echo '== Limpando instalacao anterior =='\n"
             "apt update\n"
             "apt install -y --reinstall nvidia-driver 2>/dev/null || apt install -y nvidia-driver\n"
             "echo '== Removendo xorg.conf problematico =='\n"
@@ -159,7 +238,8 @@ def build_nouveau_restore():
     if d["family"] == "debian":
         return (
             "set -e\n"
-            "apt update\n"
+            + _debian_nonfree_block()
+            + "apt update\n"
             "apt purge -y 'nvidia-*' 2>/dev/null || true\n"
             "apt install -y xserver-xorg-video-nouveau firmware-misc-nonfree || apt install -y xserver-xorg-video-nouveau\n"
             "rm -f /etc/modprobe.d/blacklist-nouveau.conf /etc/modprobe.d/blacklist.conf\n"
@@ -212,7 +292,8 @@ def build_amd():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon "
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon "
             "xf86-video-amdgpu\n"
             "echo 'Driver AMD/Radeon (Mesa) atualizado. REINICIE.'\n"
         )
@@ -245,7 +326,8 @@ def build_intel():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm mesa lib32-mesa vulkan-intel lib32-vulkan-intel "
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm mesa lib32-mesa vulkan-intel lib32-vulkan-intel "
             "xf86-video-intel\n"
             "echo 'Driver Intel atualizado. REINICIE.'\n"
         )
@@ -562,6 +644,7 @@ def build_kernel_xanmod():
     if d["family"] == "debian":
         return (
             "set -e\n"
+            "apt update\n"
             "apt install -y wget gpg\n"
             "wget -qO- https://dl.xanmod.org/gpg.key | gpg --dearmor -o /usr/share/keyrings/xanmod-archive-keyring.gpg\n"
             "echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://dl.xanmod.org/repo deb main' "
@@ -573,16 +656,17 @@ def build_kernel_xanmod():
     if d["family"] == "arch":
         return (
             "set -e\n"
-            "pacman -S --noconfirm git base-devel\n"
-            "rm -rf /tmp/chaotic-aur\n"
-            "mkdir -p /etc/pacman.d/keys\n"
+            "echo 'Habilitando repositorio chaotic-aur (chaves + mirrorlist automaticos)...'\n"
             "pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || true\n"
             "pacman-key --lsign-key 3056513887B78AEB || true\n"
+            "pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' "
+            "'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' || true\n"
             "grep -q chaotic-aur /etc/pacman.conf || "
-            "echo '[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf\n"
-            "echo 'Repo chaotic-aur habilitado (pacote linux-xanmod a partir do AUR).' \n"
+            "printf '\\n[chaotic-aur]\\nInclude = /etc/pacman.d/chaotic-mirrorlist\\n' >> /etc/pacman.conf\n"
             "pacman -Sy\n"
-            "echo 'Instale pelo AUR: paru -S linux-xanmod (se tiver um AUR helper).'\n"
+            "echo 'Repo chaotic-aur habilitado automaticamente.'\n"
+            "pacman -S --noconfirm linux-xanmod 2>/dev/null || "
+            "echo 'Instale com: pacman -S linux-xanmod (ja disponivel no chaotic-aur).'\n"
         )
     return (
         "echo 'XanMod oficial suporta Debian/Ubuntu.'\n"
@@ -596,13 +680,14 @@ def build_kernel_liquorix():
     if d["family"] == "debian":
         return (
             "set -e\n"
+            "apt update\n"
             "apt install -y curl gpg\n"
             "curl -fsSL 'https://deb.liquorix.net/linux-liquorix.gpg' | "
             "gpg --dearmor -o /etc/apt/trusted.gpg.d/liquorix.gpg\n"
             "CODENAME=$(. /etc/os-release && echo \"$VERSION_CODENAME\")\n"
             "echo \"deb https://deb.liquorix.net/ $CODENAME main\" > /etc/apt/sources.list.d/liquorix.list\n"
-            "apt update\n"
-            "apt install -y liquorix-generic\n"
+            "apt update || echo 'Aviso: repositorio Liquorix pode nao ter pacotes para este codinome.'\n"
+            "apt install -y liquorix-generic || echo 'liquorix-generic indisponivel para $CODENAME - veja https://liquorix.net'\n"
             "echo 'Kernel Liquorix instalado. REINICIE.'\n"
         )
     if d["family"] == "arch":
@@ -630,7 +715,7 @@ def build_kernel_rt():
     if d["family"] == "fedora":
         return (
             "set -e\n"
-            "dnf copr enable -y copr:copr.fedorainfracloud.org/syzdalsky/rt || true\n"
+            "dnf copr enable -y syzdalsky/rt || true\n"
             "dnf install -y kernel-rt 2>/dev/null || "
             "echo 'kernel-rt nao disponivel. Habilite updates-realtime: https://fedoraproject.org/wiki/Changes/Kernel_RT'\n"
         )
@@ -1022,6 +1107,7 @@ def _ensure_flatpak():
     """Garante flatpak + Flathub instalados (bootstrap por distro)."""
     return (
         "if ! command -v flatpak >/dev/null 2>&1; then\n"
+        "  apt update 2>/dev/null || pacman -Sy 2>/dev/null || dnf makecache 2>/dev/null || zypper refresh 2>/dev/null || true\n"
         "  " + pkg_install(["flatpak"]) + "\n"
         "fi\n"
         "flatpak remote-add --if-not-exists flathub "
@@ -1127,7 +1213,7 @@ def build_sublime():
             "| gpg --dearmor > /etc/pacman.d/gnupg/sublimehq-pacmand.gpg\n"
             "grep -q '\\[sublimehq-pacman\\]' /etc/pacman.conf || "
             "{ echo ''; echo '[sublimehq-pacman]'; "
-            "echo 'SigLevel = Required Optional trusted=only'; "
+            "echo 'SigLevel = Optional TrustAll'; "
             "echo 'Include = /etc/pacman.d/gnupg/sublimehq-pacmand.gpg'; } >> /etc/pacman.conf\n"
             "pacman -Sy --noconfirm sublime-text\n"
         )
@@ -1198,7 +1284,16 @@ def build_aider():
     return (
         "set -e\n"
         "if ! command -v pipx >/dev/null 2>&1; then\n"
-        "  sudo " + pkg_install(["pipx"]) + "\n"
+        "  echo 'pipx nao encontrado - instalando...'\n"
+        "  if [ \"$(id -u)\" = 0 ]; then\n"
+        "    " + pkg_install(["pipx"]) + "\n"
+        "  elif command -v sudo >/dev/null 2>&1; then\n"
+        "    sudo " + pkg_install(["pipx"]) + "\n"
+        "  elif command -v pkexec >/dev/null 2>&1; then\n"
+        "    pkexec " + pkg_install(["pipx"]) + "\n"
+        "  else\n"
+        "    " + pkg_install(["pipx"]) + " || true\n"
+        "  fi\n"
         "fi\n"
         "pipx install aider-chat || "
         "python3 -m pip install --user --break-system-packages aider-chat\n"
@@ -1336,6 +1431,241 @@ def build_php_lang():
             "echo '== Verificacao =='\nphp --version | head -1 || true\n"
         )
     return "echo 'Distribuicao nao suportada para PHP'\n"
+
+
+# ==================================================================
+# BUILDERS - Windows no Linux (Wine, Proton, WinBoat e afins)
+# ==================================================================
+def build_wine():
+    """Wine com repositorio oficial (WineHQ) automatico + fallback da distro."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            "dpkg --add-architecture i386 2>/dev/null || true\n"
+            "apt update\n"
+            "apt install -y wget gpg ca-certificates || true\n"
+            "mkdir -p /etc/apt/keyrings\n"
+            "echo 'Adicionando repositorio oficial do WineHQ automaticamente...'\n"
+            "wget -qO- https://dl.winehq.org/wine-builds/winehq.key | "
+            "gpg --dearmor -o /etc/apt/keyrings/winehq-archive.gpg 2>/dev/null || true\n"
+            "CODENAME=$(. /etc/os-release && echo \"$VERSION_CODENAME\")\n"
+            "if grep -qiE 'ubuntu|mint|pop' /etc/os-release; then WBASE=ubuntu; else WBASE=debian; fi\n"
+            "echo \"deb [signed-by=/etc/apt/keyrings/winehq-archive.gpg] "
+            "https://dl.winehq.org/wine-builds/$WBASE $CODENAME main\" > /etc/apt/sources.list.d/winehq.list\n"
+            "apt update || echo 'Aviso: WineHQ pode nao ter este codinome; seguindo com o pacote da distro.'\n"
+            "if apt install -y --install-recommends winehq-stable; then\n"
+            "  echo 'Wine (WineHQ) instalado.'\n"
+            "else\n"
+            "  echo 'WineHQ indisponivel - instalando o Wine da sua distro...'\n"
+            "  apt install -y wine 2>/dev/null || apt install -y wine64 wine32 2>/dev/null || true\n"
+            "fi\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "fedora":
+        return (
+            "set -e\n"
+            + _rpmfusion_block()
+            + "dnf install -y wine winetricks\n"
+            "echo 'Wine instalado (RPM Fusion habilitado automaticamente).'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed wine winetricks 2>/dev/null || pacman -S --noconfirm --needed wine\n"
+            "echo 'Wine instalado (multilib habilitado automaticamente).'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install wine wine-32bit 2>/dev/null || zypper --non-interactive install wine || true\n"
+            "echo 'Wine instalado.'\n"
+            "wine --version 2>/dev/null || true\n"
+        )
+    return "echo 'Distribuicao nao suportada para Wine'\n"
+
+
+def build_winetricks():
+    """Winetricks: DLLs/componentes do Windows para o Wine."""
+    return build_pkg(["winetricks"], verify="winetricks --version 2>/dev/null | head -1 || true")
+
+
+def build_bottles():
+    """Bottles (Flatpak): garrafas isoladas para apps/jogos do Windows."""
+    return build_flatpak_app("com.usebottles.bottles", "Bottles")
+
+
+def build_lutris():
+    """Lutris: central de jogos com instaladores da comunidade."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            "apt update\n"
+            "apt install -y curl gnupg || true\n"
+            "echo 'Adicionando repositorio oficial do Lutris automaticamente...'\n"
+            "mkdir -p /usr/share/keyrings\n"
+            "curl -fsSL 'https://download.opensuse.org/repositories/home:/strycore/Debian_12/Release.key' | "
+            "gpg --dearmor -o /usr/share/keyrings/lutris.gpg 2>/dev/null || true\n"
+            "echo \"deb [signed-by=/usr/share/keyrings/lutris.gpg] "
+            "https://download.opensuse.org/repositories/home:/strycore/Debian_12/ ./\" > /etc/apt/sources.list.d/lutris.list\n"
+            "apt update || true\n"
+            "apt install -y lutris || echo 'Lutris indisponivel no OBS - baixe em https://lutris.net'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            ". /etc/os-release\n"
+            "if ! zypper --non-interactive install lutris 2>/dev/null; then\n"
+            "  echo 'Adicionando repositorio games do openSUSE automaticamente...'\n"
+            "  if grep -qi tumbleweed /etc/os-release; then GAMES=openSUSE_Tumbleweed; else GAMES=openSUSE_Leap_${VERSION_ID}; fi\n"
+            "  zypper --non-interactive addrepo -cfp 90 "
+            "\"https://download.opensuse.org/repositories/games/$GAMES/\" games || true\n"
+            "  zypper --non-interactive refresh\n"
+            "  zypper --non-interactive install lutris || echo 'Baixe em https://lutris.net'\n"
+            "fi\n"
+        )
+    return build_pkg(["lutris"], verify="lutris --version 2>/dev/null | head -1 || true")
+
+
+def build_protonup():
+    """ProtonUp-Qt (Flatpak): gerencia o Proton-GE do Steam."""
+    return build_flatpak_app("net.davidotek.pupgui2", "ProtonUp-Qt")
+
+
+def build_heroic():
+    """Heroic Games Launcher (Flatpak): Epic, GOG e Amazon Games."""
+    return build_flatpak_app("com.heroicgameslauncher.hgl", "Heroic Games Launcher")
+
+
+def build_steam():
+    """Steam da Valve - habilita os repositorios necessarios sozinho."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return (
+            "set -e\n"
+            + _debian_nonfree_block()
+            + "dpkg --add-architecture i386 2>/dev/null || true\n"
+            "apt update\n"
+            "apt install -y steam-installer 2>/dev/null || apt install -y steam 2>/dev/null || apt install -y steam-launcher\n"
+            "echo 'Steam instalado.'\n"
+        )
+    if d["family"] == "fedora":
+        return (
+            "set -e\n"
+            + _rpmfusion_block()
+            + "dnf install -y steam\n"
+            "echo 'Steam instalado (RPM Fusion habilitado automaticamente).'\n"
+        )
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed steam\n"
+            "echo 'Steam instalado (multilib habilitado automaticamente).'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install steam\n"
+            "echo 'Steam instalado (Packman habilitado automaticamente).'\n"
+        )
+    return "echo 'Distribuicao nao suportada'\n"
+
+
+def build_playonlinux():
+    """PlayOnLinux: assistente classico para instalar apps via Wine."""
+    d = detect_distro()
+    if d["family"] == "debian":
+        return "set -e\napt update\n" + pkg_install(["playonlinux"]) + "\necho 'PlayOnLinux instalado.'\n"
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            "pacman -S --noconfirm --needed playonlinux 2>/dev/null || "
+            "echo 'PlayOnLinux esta no AUR: paru -S playonlinux (prefira o Bottles).'\n"
+        )
+    if d["family"] == "suse":
+        return (
+            "set -e\n"
+            + _suse_packman_block()
+            + "zypper --non-interactive install playonlinux || echo 'Indisponivel - prefira o Bottles (Flatpak).'\n"
+        )
+    return (
+        "set -e\n"
+        + pkg_install(["playonlinux"]) +
+        " || echo 'PlayOnLinux indisponivel nesta distro - prefira o Bottles (Flatpak).'\n"
+    )
+
+
+def build_winboat():
+    """WinBoat: Windows 11 real em container Docker/Podman, integrado ao
+    desktop. Instala o runtime, baixa a versao mais recente do GitHub e
+    adiciona o usuario ao grupo docker - tudo automaticamente."""
+    return (
+        "set -e\n"
+        "echo '== WinBoat: Windows 11 em container, integrado ao desktop =='\n"
+        "# 1) runtime de container (Docker ou Podman)\n"
+        "if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then\n"
+        "  echo 'Instalando Docker (necessario para o WinBoat)...'\n"
+        "  if command -v apt-get >/dev/null 2>&1; then apt update; apt install -y docker.io docker-compose-v2 2>/dev/null || apt install -y docker.io docker-compose\n"
+        "  elif command -v dnf >/dev/null 2>&1; then dnf install -y moby-engine docker-compose || dnf install -y docker docker-compose\n"
+        "  elif command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm --needed docker docker-compose\n"
+        "  elif command -v zypper >/dev/null 2>&1; then zypper --non-interactive install docker docker-compose\n"
+        "  fi\n"
+        "  systemctl enable --now docker 2>/dev/null || true\n"
+        "fi\n"
+        "# 2) ferramenta de download\n"
+        "if command -v curl >/dev/null 2>&1; then GET='curl -fsSL -o'; APIGET='curl -fsSL';\n"
+        "elif command -v wget >/dev/null 2>&1; then GET='wget -qO'; APIGET='wget -qO-';\n"
+        "else echo 'Instale curl ou wget.'; exit 1; fi\n"
+        "# 3) baixa o instalador mais recente (GitHub releases)\n"
+        "echo 'Buscando a versao mais recente do WinBoat...'\n"
+        "JSON=$($APIGET https://api.github.com/repos/TibixDev/winboat/releases/latest) || { echo 'Falha ao consultar o GitHub.'; exit 1; }\n"
+        "URL=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -iE 'amd64\\.deb$' | head -1)\n"
+        "RPML=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -iE 'x86_64\\.rpm$' | head -1)\n"
+        "APPL=$(echo \"$JSON\" | grep -o 'https://[^\" ]*' | grep -i 'AppImage' | head -1)\n"
+        "if command -v dpkg >/dev/null 2>&1 && [ -n \"$URL\" ]; then\n"
+        "  $GET /tmp/winboat.deb \"$URL\"\n"
+        "  dpkg -i /tmp/winboat.deb || apt install -y -f\n"
+        "elif command -v rpm >/dev/null 2>&1 && [ -n \"$RPML\" ]; then\n"
+        "  $GET /tmp/winboat.rpm \"$RPML\"\n"
+        "  if command -v dnf >/dev/null 2>&1; then dnf install -y /tmp/winboat.rpm; else zypper --non-interactive install /tmp/winboat.rpm; fi\n"
+        "elif [ -n \"$APPL\" ]; then\n"
+        "  $GET /usr/local/bin/winboat.AppImage \"$APPL\"\n"
+        "  chmod +x /usr/local/bin/winboat.AppImage\n"
+        "  ln -sf /usr/local/bin/winboat.AppImage /usr/local/bin/winboat\n"
+        "else\n"
+        "  echo 'Nao achei um pacote para sua distro - baixe em https://github.com/TibixDev/winboat/releases'\n"
+        "  exit 1\n"
+        "fi\n"
+        "# 4) usuario no grupo docker (para gerenciar o container sem senha)\n"
+        "if command -v docker >/dev/null 2>&1; then\n"
+        "  REAL_USER=${SUDO_USER:-${PKEXEC_UID:+$(id -nu \"$PKEXEC_UID\" 2>/dev/null)}}\n"
+        "  REAL_USER=${REAL_USER:-$(id -nu 1000 2>/dev/null || echo root)}\n"
+        "  usermod -aG docker \"$REAL_USER\" 2>/dev/null || true\n"
+        "  echo \"Usuario '$REAL_USER' adicionado ao grupo docker (relogue para valer).\"\n"
+        "fi\n"
+        "echo 'WinBoat instalado! Abra o WinBoat e ele prepara o Windows 11 para voce.'\n"
+    )
+
+
+def build_gamemode():
+    """GameMode + MangoHud: boost de desempenho e overlay de FPS."""
+    d = detect_distro()
+    if d["family"] == "arch":
+        return (
+            "set -e\n"
+            + _arch_multilib_block()
+            + "pacman -S --noconfirm --needed gamemode lib32-gamemode mangohud lib32-mangohud\n"
+            "echo 'GameMode + MangoHud instalados. No Steam: gamemoderun %command% e mangohud %command%'\n"
+        )
+    return build_pkg(["gamemode", "mangohud"],
+                     verify="gamemoded --version 2>/dev/null | head -1 || true")
 
 
 # ==================================================================
@@ -1570,7 +1900,7 @@ def _itens_ide():
          "script": lambda: build_flatpak_app("com.jetbrains.IntelliJ-IDEA-IC", "IntelliJ IDEA")},
         {"id": "ide-pycharm", "name": "PyCharm Community", "desc": "IDE para Python (Flathub)",
          "kind": "shell", "root": True, "danger": False,
-         "script": lambda: build_flatpak_app("com.jetbrains.PyCharm-CE-Personal", "PyCharm")},
+         "script": lambda: build_flatpak_app("com.jetbrains.PyCharm-Community", "PyCharm")},
         {"id": "ide-eclipse", "name": "Eclipse", "desc": "IDE clássica multi-linguagem (Flathub)",
          "kind": "shell", "root": True, "danger": False,
          "script": lambda: build_flatpak_app("org.eclipse.EclipseIDE", "Eclipse")},
@@ -1616,6 +1946,31 @@ def _itens_ide():
     ]
 
 
+def _itens_windows():
+    return [
+        {"id": "win-wine", "name": "Wine", "desc": "Rode programas .exe do Windows (repo WineHQ automático)",
+         "kind": "shell", "root": True, "danger": False, "script": build_wine},
+        {"id": "win-winetricks", "name": "Winetricks", "desc": "DLLs e componentes do Windows para o Wine",
+         "kind": "shell", "root": True, "danger": False, "script": build_winetricks},
+        {"id": "win-bottles", "name": "Bottles", "desc": "Apps/jogos do Windows em 'garrafas' isoladas (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_bottles},
+        {"id": "win-lutris", "name": "Lutris", "desc": "Central de jogos com instaladores da comunidade",
+         "kind": "shell", "root": True, "danger": False, "script": build_lutris},
+        {"id": "win-protonup", "name": "ProtonUp-Qt", "desc": "Instala/atualiza o Proton-GE do Steam (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_protonup},
+        {"id": "win-heroic", "name": "Heroic Games Launcher", "desc": "Epic, GOG e Amazon Games no Linux (Flatpak)",
+         "kind": "shell", "root": True, "danger": False, "script": build_heroic},
+        {"id": "win-steam", "name": "Steam", "desc": "Loja da Valve (habilita os repos necessários sozinho)",
+         "kind": "shell", "root": True, "danger": False, "script": build_steam},
+        {"id": "win-playonlinux", "name": "PlayOnLinux", "desc": "Assistente clássico para instalar apps via Wine",
+         "kind": "shell", "root": True, "danger": False, "script": build_playonlinux},
+        {"id": "win-winboat", "name": "WinBoat (Windows 11)", "desc": "Windows 11 real em container, integrado ao desktop",
+         "kind": "shell", "root": True, "danger": True, "script": build_winboat},
+        {"id": "win-gamemode", "name": "GameMode + MangoHud", "desc": "Boost de desempenho e overlay de FPS para jogos",
+         "kind": "shell", "root": True, "danger": False, "script": build_gamemode},
+    ]
+
+
 def _itens_lang():
     return [
         {"id": "lang-python", "name": "Python 3 + pip + venv", "desc": "Linguagem e ecossistema oficiais",
@@ -1654,6 +2009,8 @@ CATEGORIES = [
      "color": "#8a5ad9", "items": _itens_dev()},
     {"id": "ide", "name": "IDEs, Editores e IA", "icon": "text-editor-symbolic",
      "color": "#b85cd9", "items": _itens_ide()},
+    {"id": "windows", "name": "Windows no Linux", "icon": "applications-games-symbolic",
+     "color": "#6c5ce7", "items": _itens_windows()},
     {"id": "lang", "name": "Linguagens de Programação", "icon": "applications-science-symbolic",
      "color": "#d97b2e", "items": _itens_lang()},
     {"id": "health", "name": "Saúde e Bem-estar", "icon": "battery-symbolic",
@@ -1752,6 +2109,17 @@ ITEM_ICONS = {
     "ai-gemini": "applications-science-symbolic",
     "tool-essential": "applications-engineering-symbolic",
     "tool-docker": "package-x-generic-symbolic",
+    # --- Windows no Linux ---
+    "win-wine": "system-run-symbolic",
+    "win-winetricks": "system-software-install-symbolic",
+    "win-bottles": "package-x-generic-symbolic",
+    "win-lutris": "applications-games-symbolic",
+    "win-protonup": "software-update-available-symbolic",
+    "win-heroic": "applications-games-symbolic",
+    "win-steam": "input-gaming-symbolic",
+    "win-playonlinux": "application-x-executable-symbolic",
+    "win-winboat": "computer-symbolic",
+    "win-gamemode": "media-playback-start-symbolic",
     # --- Linguagens de Programação ---
     "lang-python": "text-x-generic-symbolic",
     "lang-java": "applications-science-symbolic",
@@ -1840,6 +2208,7 @@ def item_available(item, family=None):
 
 def distro_report(list_available=False):
     """Relatório textual do identificador de distro + ações disponíveis."""
+    from .i18n import t, tr_cat, tr_item
     d = detect_distro()
     fam = d["family"]
     items = [it for cat in CATEGORIES for it in cat["items"]]
@@ -1847,29 +2216,29 @@ def distro_report(list_available=False):
     blocked = [it for it in items if not item_available(it, fam)]
     nome = d["name"] + (f" {d['version']}" if d["version"] else "")
     linhas = [
-        "lunuz tools - identificador de distro",
-        "=====================================",
-        f"Sistema:  {nome}",
-        f"ID:       {d['id']}",
-        f"Familia:  {FAMILY_NAMES.get(fam, fam)} ({fam})",
-        f"Pacotes:  {PKG_MGRS.get(fam, '-')}",
-        f"Acoes:    {len(items)} total - {len(avail)} disponiveis aqui, "
-        f"{len(blocked)} indisponiveis",
+        t("report_title"),
+        t("report_sep"),
+        f"{t('r_system')}  {nome}",
+        f"{t('r_id')}       {d['id']}",
+        f"{t('r_family')}  {FAMILY_NAMES.get(fam, fam)} ({fam})",
+        f"{t('r_pkgs')}  {PKG_MGRS.get(fam, '-')}",
+        f"{t('r_actions')}    " + t("r_actions_line", total=len(items),
+                                    ok=len(avail), blocked=len(blocked)),
     ]
     if blocked:
         linhas.append("")
-        linhas.append("Indisponiveis nesta distro:")
+        linhas.append(t("r_blocked"))
         for it in blocked:
             fams = ", ".join(FAMILY_NAMES.get(f, f) for f in available_families(it))
-            linhas.append(f"  - {it['name']}  (so em: {fams})")
+            linhas.append(t("r_only_in", name=tr_item(it)[0], fams=fams))
     if list_available:
         linhas.append("")
-        linhas.append(f"Disponiveis aqui ({len(avail)}):")
+        linhas.append(t("r_avail", n=len(avail)))
         for it in avail:
-            linhas.append(f"  - [{it['id']}] {it['name']}")
+            linhas.append(t("r_item", id=it["id"], name=tr_item(it)[0]))
     elif blocked:
         linhas.append("")
-        linhas.append("Use `lunuz distro --list` para listar as acoes disponiveis.")
+        linhas.append(t("r_hint"))
     return "\n".join(linhas)
 
 

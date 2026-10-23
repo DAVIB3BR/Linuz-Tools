@@ -11,3 +11,6 @@ flatpak (fonte):  flatpak-builder --user --install build org.davi.lunuz-tools.js
 snap (fonte):     cd snapcraft.yaml-dir && snapcraft     (requer snapd)
 dnf/yum repo:     hospede o .rpm em uma URL e adicione lunuz-tools.repo
                   sudo dnf config-manager --add-repo lunuz-tools.repo
+
+ARM (aarch64): veja dist/arm/LEIA-ME.md - os mesmos pacotes all/noarch/any
+               funcionam nativamente em ARM (Raspberry Pi, Fedora ARM...)

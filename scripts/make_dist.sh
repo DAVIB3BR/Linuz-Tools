@@ -220,7 +220,78 @@ flatpak (fonte):  flatpak-builder --user --install build org.davi.lunuz-tools.js
 snap (fonte):     cd snapcraft.yaml-dir && snapcraft     (requer snapd)
 dnf/yum repo:     hospede o .rpm em uma URL e adicione lunuz-tools.repo
                   sudo dnf config-manager --add-repo lunuz-tools.repo
+
+ARM (aarch64): veja dist/arm/LEIA-ME.md - os mesmos pacotes all/noarch/any
+               funcionam nativamente em ARM (Raspberry Pi, Fedora ARM...)
 TXT
+
+# ------------------------------------------------------------------
+# 7.1) ARM (aarch64) - pacotes independentes de arquitetura
+# ------------------------------------------------------------------
+echo "  - arm (aarch64)"
+mkdir -p "$DIST/arm"
+for f in "${NAME}_${VER}_all.deb" "${NAME}-${VER}-1.noarch.rpm" \
+         "${NAME}-${VER}-1-any.pkg.tar.zst" "lunuz-tools-$VER.tar.gz" \
+         "lunuz-tools-$VER.tar.xz" "lunuz-tools-$VER.zip"; do
+  [ -f "$DIST/$f" ] && cp "$DIST/$f" "$DIST/arm/"
+done
+cat > "$DIST/arm/LEIA-ME.md" <<ARM
+# 🦾 lunuz tools $VER para ARM (aarch64)
+
+> **Lunuz-Tools é 100% Python** — os pacotes são \`all\` / \`noarch\` / \`any\`
+> (independentes de arquitetura). Isso significa que estes arquivos rodam
+> **nativamente em ARM64** sem nenhuma alteração: os nomes não dizem
+> "arm64" porque o pacote serve para **todas** as arquiteturas, inclusive
+> ARM.
+
+## 💻 Funciona em
+
+- 🍓 Raspberry Pi OS (64-bit) / Raspberry Pi 4 e 5
+- 🧊 Ubuntu/Debian ARM64 (M1/M2 com VM, Ampere, ...)
+- 🎩 Fedora ARM64 / RHEL ARM
+- 🎀 Manjaro/Arch ARM, openSUSE ARM
+
+## 📥 Instalação no ARM
+
+| Formato | Comando |
+|---------|---------|
+| 🧊 Debian/Ubuntu/RPi OS | \`sudo apt install ./${NAME}_${VER}_all.deb\` |
+| 🎩 Fedora ARM | \`sudo dnf install ./${NAME}-${VER}-1.noarch.rpm\` |
+| 🎀 Arch/Manjaro ARM | \`sudo pacman -U ${NAME}-${VER}-1-any.pkg.tar.zst\` |
+| 📦 Qualquer distro | \`tar -xJf lunuz-tools-$VER.tar.xz && cd lunuz-tools-$VER && python3 -m lunuz gui\` |
+
+## ⚙️ Dependências da GUI no ARM
+
+\`\`\`bash
+# Debian/Ubuntu/RPi OS
+sudo apt install python3 python3-gi gir1.2-gtk-3.0 gir1.2-vte-2.91
+# Fedora
+sudo dnf install python3 python3-gobject gtk3 vte291
+# Arch
+sudo pacman -S python python-gobject gtk3 vte3
+\`\`\`
+
+## 🖼️ AppImage para ARM
+
+- \`linuz_tools-aarch64.AppImage\` — AppImage nativo **ARM64** (runtime
+  oficial do AppImageKit para aarch64)
+- Assim como na versão x86_64, o AppImage usa o **Python 3 + GTK/VTE do
+  sistema** (instale as dependências abaixo se necessário)
+
+## ❓ E o AppImage x86_64?
+
+O \`linuz_tools-x86_64.AppImage\` (na raiz do repositório) é o único
+artefato restrito a x86_64. Para ARM use o \`linuz_tools-aarch64.AppImage\`
+desta pasta ou os pacotes acima — o resultado é o mesmo app completo, com
+as **14 seções / 112 recursos**, o suporte a **11 idiomas** e os
+**repositórios automáticos**.
+
+---
+lunuz tools $VER 🌙 • https://github.com/DAVIB3BR/Linuz-Tools
+ARM
+
+# se o AppImage ARM estiver na raiz, inclua na pasta arm
+[ -f "$ROOT/linuz_tools-aarch64.AppImage" ] && cp "$ROOT/linuz_tools-aarch64.AppImage" "$DIST/arm/" || true
 
 # ------------------------------------------------------------------
 # 8) verificacao

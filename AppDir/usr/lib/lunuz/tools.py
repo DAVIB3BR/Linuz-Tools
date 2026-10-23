@@ -166,12 +166,56 @@ def find(path, name=None, file_type=None):
 
 
 def chmod(mode, files):
-    """Change file permissions."""
-    import stat
+    """Change file permissions (numeric like 755 or symbolic like +x, u+x, go-w)."""
+    import stat as _stat
+    import re
+
+    # bits rwx por classe: u=user, g=group, o=others
+    _RWX = {"r": 4, "w": 2, "x": 1}
+    _SHIFT = {"u": 6, "g": 3, "o": 0}
+
+    def _apply_symbolic(current, spec):
+        """Aplica spec simbolica (ex.: 'u+x', 'go-w', 'a=rw') ao modo atual."""
+        m = re.fullmatch(r"([ugoa]*)((?:[+\-=][rwxXst]+)+)", spec)
+        if not m:
+            raise ValueError(f"modo simbolico invalido: {spec}")
+        who = m.group(1) or "ugo"
+        if who == "a":
+            who = "ugo"
+        new_mode = current
+        for og in re.finditer(r"[+\-=][rwxXst]+", spec):
+            op, perms = og.group()[0], og.group()[1:]
+            for t in who:
+                shift = _SHIFT[t]
+                mask = 0
+                for ch in perms:
+                    if ch in _RWX:
+                        mask |= _RWX[ch] << shift
+                    elif ch == "s":
+                        mask |= (_stat.S_ISUID if t == "u"
+                                 else _stat.S_ISGID if t == "g" else 0)
+                    elif ch == "t":
+                        if t == "o":
+                            mask |= _stat.S_ISVTX
+                    # 'X' tratado como 'x' (simplificacao)
+                if op == "+":
+                    new_mode |= mask
+                elif op == "-":
+                    new_mode &= ~mask
+                else:  # '=': limpa rwx da classe antes de aplicar
+                    new_mode &= ~((4 | 2 | 1) << shift)
+                    new_mode |= mask
+        return new_mode
+
     for file in files:
         try:
-            os.chmod(file, int(mode, 8) if mode.isdigit() else getattr(stat, f'CHMOD_{mode.replace("/", "_").upper()}', None) or int(mode, 8))
-            # Simple handling: if numeric, use int(); otherwise try common symbols
+            if mode.isdigit():
+                os.chmod(file, int(mode, 8))
+            else:
+                current = os.stat(file).st_mode
+                for spec in [s.strip() for s in mode.split(",") if s.strip()]:
+                    current = _apply_symbolic(current, spec)
+                os.chmod(file, current)
         except FileNotFoundError:
             print(f"lunuz: cannot access '{file}': No such file or directory", file=sys.stderr)
         except (ValueError, OSError) as e:
@@ -198,7 +242,7 @@ def chown(owner, files):
                 stat_info = _os.stat(file)
                 current_uid = stat_info.st_uid
                 current_gid = stat_info.st_gid
-            except _OSError:
+            except OSError:
                 current_uid = 0
                 current_gid = 0
             
@@ -265,7 +309,12 @@ def java(file, compile_only=False):
     result = subprocess.run([javac_bin, "-d", tmpdir, file])
     if result.returncode != 0:
         sys.exit(result.returncode)
-    result = subprocess.run([java_bin, "-cp", tmpdir, classname])
+    # java pode nao estar no PATH mas viver junto ao javac (JDK/JRE separados)
+    java_run = java_bin or os.path.join(os.path.dirname(javac_bin), "java")
+    if not os.path.isfile(java_run) and not os.path.isfile(java_run + ".exe"):
+        print(f"lunuz: executavel 'java' nao encontrado (procurado em {java_run}).", file=sys.stderr)
+        sys.exit(1)
+    result = subprocess.run([java_run, "-cp", tmpdir, classname])
     sys.exit(result.returncode)
 
 
